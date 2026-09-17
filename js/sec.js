@@ -1,8 +1,16 @@
-// All data comes live from SEC EDGAR's free, public, no-key JSON APIs.
-// Nothing is fetched through or stored on any server we control — the browser
-// talks to data.sec.gov / www.sec.gov directly, on the fly, per request.
-
-const TICKERS_URL = "https://www.sec.gov/files/company_tickers.json";
+// Company-facts figures come live from SEC EDGAR's free, public, no-key XBRL
+// API — the browser talks to data.sec.gov directly, on the fly, per request.
+// Nothing is fetched through or stored on any server we control.
+//
+// The ticker -> CIK lookup list is the one exception: SEC publishes it from
+// www.sec.gov (a plain content server, not the data.sec.gov API domain) with
+// no CORS header, so browsers refuse to read it cross-origin from any other
+// site. It's small (~1MB) and public reference data that changes rarely, so
+// the free deploy pipeline (see .github/workflows/deploy-pages.yml) fetches
+// a fresh copy server-side on every deploy and publishes it same-origin
+// alongside the site — no CORS problem, no database, still refreshed
+// automatically on every deploy rather than hand-maintained.
+const TICKERS_URL = "data/company_tickers.json";
 const FACTS_URL = (cik10) => `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik10}.json`;
 
 let tickerIndexPromise = null;
@@ -12,12 +20,11 @@ function padCik(cik) {
 }
 
 // Fetches (once per page load) the SEC's full ticker -> CIK -> name map.
-// This is a single static JSON file SEC publishes for exactly this purpose.
 export function loadTickerIndex() {
   if (!tickerIndexPromise) {
     tickerIndexPromise = fetch(TICKERS_URL, { headers: { Accept: "application/json" } })
       .then((res) => {
-        if (!res.ok) throw new Error(`SEC ticker list request failed (${res.status})`);
+        if (!res.ok) throw new Error(`Ticker list request failed (${res.status}). Run scripts/fetch-tickers.sh once if you're testing locally.`);
         return res.json();
       })
       .then((raw) => {

@@ -106,7 +106,11 @@ async function loadDossier(tickerQuery) {
     setActiveTab(state.activeTab);
   } catch (err) {
     console.error(err);
-    setStatus(`Something went wrong fetching live data from SEC EDGAR: ${err.message || err}. This can happen if SEC's public API is rate-limiting or temporarily unreachable — try again in a moment.`, true);
+    const isNetworky = err instanceof TypeError;
+    const hint = isNetworky
+      ? "This usually means the request never reached SEC at all — a browser extension (ad/tracker blocker), offline network, or a temporary SEC outage. Check your browser's console/network tab for the blocked request, then try again."
+      : "This can happen if SEC's public API is rate-limiting or temporarily unreachable — try again in a moment.";
+    setStatus(`Something went wrong fetching live data from SEC EDGAR: ${err.message || err}. ${hint}`, true);
   }
 }
 
