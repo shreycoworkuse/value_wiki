@@ -4,13 +4,45 @@ import { detectRedFlags } from "./redflags.js";
 import { buildChecklist } from "./verdict.js";
 import { initGlossary } from "./glossary.js";
 import { renderCoverStory, renderKpiGrid, renderFollowTheMoney, renderVerdict, renderValuation, renderSources } from "./ui.js";
+import { renderStories } from "./stories.js";
+import { renderTimeline } from "./timeline.js";
+import { renderExecutionConsistency } from "./execution.js";
+import { renderValuationExtra } from "./valuation-extra.js";
+import { renderCompare } from "./compare.js";
+import { initTour } from "./tour.js";
+
+// Reused by the Compare tab to fetch and compute a second company's full
+// dossier state via the exact same live pipeline as the main dossier.
+async function fetchCompanyState(tickerQuery) {
+  const match = await findTickerExact(tickerQuery);
+  if (!match) {
+    throw new Error(`Couldn't find a US-listed ticker matching "${tickerQuery}".`);
+  }
+  const facts = await fetchCompanyFacts(match.cik);
+  const base = buildAnnualSeries(facts);
+  if (!base.years.length) {
+    throw new Error(`SEC has a record for ${match.name}, but no usable annual (10-K) XBRL figures were found.`);
+  }
+  const derived = computeDerived(base);
+  const checklist = buildChecklist(base, derived);
+  return {
+    company: { name: match.name, ticker: match.ticker, cik: match.cik },
+    base,
+    derived,
+    checklist,
+  };
+}
 
 const TABS = [
   { id: "cover", label: "Cover story", render: renderCoverStory },
   { id: "kpis", label: "KPI chapters", render: renderKpiGrid },
+  { id: "stories", label: "Stories", render: renderStories },
   { id: "money", label: "Follow the money", render: renderFollowTheMoney },
+  { id: "timeline", label: "Timeline", render: renderTimeline },
+  { id: "execution", label: "Track Record", render: renderExecutionConsistency },
   { id: "verdict", label: "Verdict", render: renderVerdict },
-  { id: "worth", label: "What is it worth", render: renderValuation },
+  { id: "worth", label: "What is it worth", render: (panel, args) => { renderValuation(panel, args); renderValuationExtra(panel, args); } },
+  { id: "compare", label: "Compare", render: (panel, args) => renderCompare(panel, args, fetchCompanyState) },
   { id: "sources", label: "Sources", render: renderSources },
 ];
 
@@ -38,6 +70,7 @@ const el = {
   searchResults: document.getElementById("search-results"),
   priceInput: document.getElementById("price-input"),
   exportBtn: document.getElementById("export-csv"),
+  exportPdfBtn: document.getElementById("export-pdf"),
   themeToggle: document.getElementById("theme-toggle"),
 };
 
@@ -84,6 +117,10 @@ async function loadDossier(tickerQuery) {
       setStatus(`SEC has a record for ${match.name}, but no usable annual (10-K) XBRL figures were found to build a dossier from.`, true);
       return;
     }
+    onProgress(`Found ${base.years.length} years of annual filings (FY${base.years[0]}–FY${base.years[base.years.length - 1]})`);
+    if (base.series.dividendsPaid.every((v) => v === null)) {
+      onProgress("No dividend data found — this company may not pay a dividend.");
+    }
     const derived = computeDerived(base);
     const redFlags = detectRedFlags(base, derived);
     const checklist = buildChecklist(base, derived);
@@ -121,21 +158,50 @@ function buildTabs() {
     const btn = document.createElement("button");
     btn.textContent = tab.label;
     btn.dataset.tab = tab.id;
+    btn.id = `tab-btn-${tab.id}`;
     btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", "false");
+    btn.setAttribute("aria-controls", `tab-panel-${tab.id}`);
+    btn.setAttribute("tabindex", "-1");
     btn.addEventListener("click", () => setActiveTab(tab.id));
     el.tabs.append(btn);
 
     const panel = document.createElement("div");
     panel.className = "tab-panel hidden";
     panel.dataset.panel = tab.id;
+    panel.id = `tab-panel-${tab.id}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", `tab-btn-${tab.id}`);
+    panel.setAttribute("tabindex", "0");
     el.panels.append(panel);
   }
 }
 
+// Roving-tabindex tab list needs Left/Right/Home/End to stay keyboard-operable,
+// since only the active tab button sits in the normal Tab order (per WAI-ARIA
+// Authoring Practices for the tabs pattern).
+el.tabs.addEventListener("keydown", (e) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  const buttons = Array.from(el.tabs.querySelectorAll("button"));
+  const currentIndex = buttons.findIndex((b) => b.dataset.tab === state.activeTab);
+  if (currentIndex === -1) return;
+  let nextIndex = currentIndex;
+  if (e.key === "ArrowLeft") nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+  else if (e.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+  else if (e.key === "Home") nextIndex = 0;
+  else if (e.key === "End") nextIndex = buttons.length - 1;
+  e.preventDefault();
+  setActiveTab(buttons[nextIndex].dataset.tab);
+  buttons[nextIndex].focus();
+});
+
 function setActiveTab(tabId) {
   state.activeTab = tabId;
   for (const btn of el.tabs.querySelectorAll("button")) {
-    btn.classList.toggle("active", btn.dataset.tab === tabId);
+    const isActive = btn.dataset.tab === tabId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", String(isActive));
+    btn.setAttribute("tabindex", isActive ? "0" : "-1");
   }
   for (const panel of el.panels.querySelectorAll(".tab-panel")) {
     panel.classList.toggle("hidden", panel.dataset.panel !== tabId);
@@ -241,6 +307,9 @@ el.exportBtn.addEventListener("click", () => {
   URL.revokeObjectURL(a.href);
 });
 
+// --- Full-dossier PDF export (browser print-to-PDF; see css/print.css) ---
+el.exportPdfBtn.addEventListener("click", () => window.print());
+
 // --- Theme toggle ---
 el.themeToggle.addEventListener("click", () => {
   const root = document.documentElement;
@@ -258,6 +327,7 @@ try {
 // --- Boot ---
 initGlossary();
 showLanding();
+initTour();
 
 const initialTicker = new URL(window.location.href).searchParams.get("ticker");
 if (initialTicker) {

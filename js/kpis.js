@@ -88,6 +88,12 @@ function div(a, b) {
   return a / b;
 }
 
+// Simple year-over-year growth rate for a raw series, e.g. [null, 0.12, -0.03, ...].
+// First year is always null (nothing to compare it to) — never fabricated.
+function growthOf(arr) {
+  return arr.map((_, i) => (i === 0 ? null : div(arr[i] - arr[i - 1], arr[i - 1])));
+}
+
 // Derived ratios computed client-side, on the fly, from the raw filed figures.
 export function computeDerived({ years, series }) {
   const n = years.length;
@@ -142,6 +148,66 @@ export function computeDerived({ years, series }) {
     return div(nopat, investedCapital);
   });
 
+  // Return on Capital Employed: operating income over (assets minus current
+  // liabilities) — a pre-tax, leverage-aware cousin of ROIC that doesn't
+  // require guessing a tax rate.
+  const roce = years.map((_, i) => {
+    const opInc = series.operatingIncome[i];
+    const assets_ = series.assets[i];
+    const liabCurrent = series.liabilitiesCurrent[i];
+    if (opInc === null || assets_ === null || liabCurrent === null) return null;
+    return div(opInc, assets_ - liabCurrent);
+  });
+
+  // Straightforward YoY growth rates for a few more series worth trending.
+  const netIncomeGrowth = growthOf(series.netIncome);
+  const epsGrowth = growthOf(series.dilutedEps);
+  // Book value (equity) growth — how fast the owners' stake is compounding.
+  const equityGrowth = growthOf(series.equity);
+  // Diluted share count growth: positive = dilution (more shares issued),
+  // negative = net buybacks — a cheap, honest read on capital allocation.
+  const shareCountGrowth = growthOf(series.dilutedShares);
+
+  const fcfPerShare = years.map((_, i) => div(freeCashFlow[i], series.dilutedShares[i]));
+
+  // Cash conversion: operating cash flow vs. net income — a classic
+  // "quality of earnings" check. Only meaningful when earnings are positive,
+  // so a loss year is left as a gap rather than a sign-flipped ratio.
+  const cashConversion = years.map((_, i) => {
+    const ni = series.netIncome[i];
+    const ocf = series.operatingCashFlow[i];
+    if (ni === null || ni <= 0 || ocf === null) return null;
+    return div(ocf, ni);
+  });
+
+  const debtToAssets = years.map((_, i) => div(series.longTermDebt[i], series.assets[i]));
+
+  // Capital intensity: how much of every revenue dollar gets plowed back
+  // into property, plant & equipment.
+  const capexToRevenue = years.map((_, i) => div(series.capex[i], series.revenue[i]));
+
+  // Effective tax rate, backed out from reported tax expense vs. pretax
+  // income (net income + tax expense). Left as a gap when pretax income
+  // isn't positive, since the ratio stops meaning anything sensible there.
+  const effectiveTaxRate = years.map((_, i) => {
+    const ni = series.netIncome[i];
+    const tax = series.incomeTaxExpense[i];
+    if (ni === null || tax === null) return null;
+    const pretax = ni + tax;
+    if (pretax <= 0) return null;
+    return div(tax, pretax);
+  });
+
+  // What share of free cash flow (rather than GAAP net income) gets paid
+  // out as dividends — a stricter affordability check than the payout
+  // ratio above, since FCF is what's actually left to distribute.
+  const fcfPayoutRatio = years.map((_, i) => {
+    const dividends = series.dividendsPaid[i];
+    const fcf = freeCashFlow[i];
+    if (dividends === null || fcf === null || fcf <= 0) return null;
+    return Math.abs(dividends) / fcf;
+  });
+
   return {
     years,
     n,
@@ -160,6 +226,17 @@ export function computeDerived({ years, series }) {
     assetTurnover,
     dividendPayoutRatio,
     roic,
+    roce,
+    netIncomeGrowth,
+    epsGrowth,
+    equityGrowth,
+    shareCountGrowth,
+    fcfPerShare,
+    cashConversion,
+    debtToAssets,
+    capexToRevenue,
+    effectiveTaxRate,
+    fcfPayoutRatio,
   };
 }
 

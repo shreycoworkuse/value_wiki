@@ -25,6 +25,120 @@ export const GLOSSARY = {
   "capital expenditures": { def: "Money spent buying, building or maintaining long-term assets like factories, equipment or stores.", analogy: "The cost of a new roof or a new delivery van, not the electric bill." },
   "cash conversion": { def: "How closely free cash flow tracks reported net income — a check on whether 'profit' is really turning into spendable cash.", analogy: "A friend who says they're 'rich' but has no cash on hand has a cash-conversion problem." },
   "leverage": { def: "The use of borrowed money to fund a business — higher leverage means higher risk and higher potential reward.", analogy: "A small down payment on a house is high leverage; paying in full is no leverage at all." },
+  "gross margin": { def: "Revenue minus the direct cost of making the product, divided by revenue — how much is kept before covering rent, salaries and marketing.", analogy: "If a $20 shirt costs $8 to make, gross margin is 60% — the rest must cover rent and salaries." },
+  "gross profit": { def: "Revenue minus the direct cost of making what was sold — profit before overhead like rent, salaries or marketing.", analogy: "A lemonade stand's cash from sales minus just the lemons and sugar, before paying for the table or sign." },
+  "current ratio": { def: "Current assets divided by current liabilities — whether a company has enough short-term resources to cover bills due within a year.", analogy: "Checking if the cash and stuff in your wallet covers the bills sitting on your kitchen counter." },
+  "quick ratio": { def: "Like the current ratio but excludes inventory — a stricter check on whether a company can pay near-term bills fast.", analogy: "Counting only your cash and bank balance, not the unsold stuff you'd still need to sell at a garage sale." },
+  "net debt": { def: "Total debt minus cash on hand — how much a company would still owe if it used every dollar of cash to pay debt down.", analogy: "Your credit card balance minus what's sitting in your checking account right now." },
+  "asset turnover": { def: "Revenue divided by total assets — how efficiently a company uses everything it owns to generate sales.", analogy: "A food truck that serves more meals per year than a diner with similar equipment is turning its assets over faster." },
+  "roic": { def: "Return on Invested Capital: after-tax operating profit divided by the money invested in the business — how well capital turns into profit.", analogy: "If you put $100 into a vending machine and it profits $20 a year, that's a 20% return on invested capital." },
+  "nopat": { def: "Net Operating Profit After Tax: operating profit with an estimated tax bite subtracted, used to judge a business's core performance.", analogy: "Your take-home pay from your day job alone, ignoring investment income or side gigs." },
+  "invested capital": { def: "The total money — from both owners and lenders — tied up and put to work running the business.", analogy: "The combined cash from your own savings and a bank loan you used to buy a food truck." },
+  "dividend payout ratio": { def: "The share of net income a company pays out to shareholders as dividends instead of reinvesting it.", analogy: "If you earn $100 babysitting and hand $30 to your sibling, your payout ratio is 30%." },
+  "fcf margin": { def: "Free cash flow divided by revenue — how many cents of every sales dollar end up as real, spendable cash.", analogy: "Like net margin, but measuring cash actually left over instead of accounting profit on paper." },
+  "book value per share": { def: "Total shareholders' equity divided by the number of shares — the accounting net worth behind a single share.", analogy: "If a company's whole net worth were split evenly among every share, this is what one slice is worth on paper." },
+  "revenue growth": { def: "How much a company's sales increased or shrank compared to a prior period, usually shown as a percentage.", analogy: "Comparing this year's lemonade stand sales to last summer's to see if business is picking up." },
+  "market cap": { def: "Market Capitalization: stock price multiplied by shares outstanding — what the market currently thinks the whole company is worth.", analogy: "If someone offered to buy every single share at today's price, this is the total check they'd write." },
+  "enterprise value": { def: "Market cap plus debt minus cash — a fuller price tag for buying the whole business, debts included.", analogy: "Buying a house means paying the sale price plus taking on its mortgage, minus any cash left in its accounts." },
+  "ev/ebitda": { def: "Enterprise value divided by EBITDA — a valuation ratio often used to compare companies with different debt loads or tax rates.", analogy: "Like a P/E ratio, but leveling the playing field between a company that borrows heavily and one that doesn't." },
+  "dividend yield": { def: "Annual dividend per share divided by the stock price — the cash return from owning the stock, before any price change.", analogy: "Like the interest rate on a savings account, but paid out by a stock instead of a bank." },
+  "effective tax rate": { def: "The actual percentage of pretax profit a company pays in taxes, which can differ from the official statutory tax rate.", analogy: "Your real tax bill after deductions and credits, versus the flat rate printed in the tax bracket table." },
+  "working capital": { def: "Current assets minus current liabilities — the cushion of short-term resources a company has to run day-to-day operations.", analogy: "The spending money left in your wallet after subtracting this month's bills from what's on hand." },
+  "ebitda": { def: "Earnings Before Interest, Taxes, Depreciation and Amortization — a rough measure of core operating profit before certain non-cash and financing costs.", analogy: "Judging how a restaurant runs day-to-day before worrying about its loan payments or how fast its ovens wear out." },
+  "ebit": { def: "Earnings Before Interest and Taxes — operating profit before the effects of debt costs and the tax bill.", analogy: "Judging a runner's raw speed before adding in the weight of heavy shoes (debt) or a headwind (taxes)." },
+  "operating leverage": { def: "How much a company's operating profit swings when sales change, driven by how many of its costs are fixed versus variable.", analogy: "A movie theater with high fixed rent earns way more from a packed house than an empty one — profit swings hard." },
+  "financial leverage": { def: "How much debt a company uses relative to equity, which magnifies both gains and losses for shareholders.", analogy: "A house bought with a small down payment gains, or loses, a much bigger percentage on your cash than one bought outright." },
+  "liquidity": { def: "How easily a company or asset can turn into cash without a big loss in value, especially to cover near-term bills.", analogy: "Cash in a checking account is highly liquid; a house you own is not — it takes time and effort to sell." },
+  "solvency": { def: "Whether a company's total assets are enough to cover its total liabilities over the long run, not just this month's bills.", analogy: "Checking whether your total savings and property outweigh everything you owe, not just what's due this week." },
+  "days sales outstanding": { def: "The average number of days it takes a company to collect cash after making a sale on credit.", analogy: "How many days, on average, it takes to actually get paid after you've already delivered the pizza." },
+  "discounted cash flow": { def: "A valuation method that estimates what a business is worth today by predicting its future cash and shrinking those future dollars back to today's value.", analogy: "Asking how much you'd pay today for a lemonade stand's promised cash over the next 10 summers." },
+  "terminal value": { def: "The estimated value of all the cash a business will generate far into the future, beyond the years explicitly forecast.", analogy: "Instead of forecasting earnings for 100 years, a shortcut estimate covering everything after year 10." },
+  "discount rate": { def: "The interest rate used to shrink future cash flows down to what they're worth in today's dollars, standing in for risk and time.", analogy: "The rate you'd demand to wait for money later instead of having it in hand today." },
+  "present value": { def: "What a future sum of money is worth today, after accounting for the fact that money now is worth more than money later.", analogy: "$110 promised a year from now might only feel worth $100 to you today." },
+  "cost of capital": { def: "The return a company must earn on its investments to satisfy both its lenders and its shareholders.", analogy: "The minimum interest rate a project needs to clear before it's worth doing, like a hurdle it must jump over." },
+  "wacc": { def: "Weighted Average Cost of Capital: the blended rate a company must earn overall, combining what it pays lenders and what it owes shareholders.", analogy: "Averaging the interest rate on your mortgage and the return your business partner expects, weighted by what each put in." },
+  "goodwill": { def: "An intangible asset on the balance sheet representing the premium a company paid to buy another business above its accounting net worth.", analogy: "Paying $12 million for a $10 million lemonade empire because of its loyal customers — that extra $2 million is goodwill." },
+  "amortization": { def: "Gradually writing down the cost of an intangible asset, like a patent or acquired brand, as an expense over its useful life.", analogy: "Spreading the cost of a multi-year magazine subscription across each issue instead of expensing it all on day one." },
+  "depreciation": { def: "Gradually writing down the cost of a physical asset, like machinery or a building, as an expense over its useful life.", analogy: "Spreading the cost of a delivery van over the years it'll actually be driven, instead of all at once." },
+  "accrual accounting": { def: "Recording revenue when it's earned and expenses when they're incurred, not necessarily when cash actually changes hands.", analogy: "Logging a chore as done the day you finish it, even if your allowance doesn't arrive until next week." },
+  "gaap": { def: "Generally Accepted Accounting Principles: the standard accounting rulebook U.S. public companies must follow when filing official financial statements.", analogy: "A shared rulebook every basketball league agrees to use, so games — and financial reports — can be fairly compared." },
+  "non-gaap": { def: "Company-adjusted figures that strip out certain items management considers unusual, calculated outside the official rulebook and not audited the same way.", analogy: "A player bragging about points scored 'if we don't count the games we lost' — sometimes useful, sometimes a spin." },
+  "restatement": { def: "When a company corrects and re-files previously reported financial results because they contained an error.", analogy: "Handing back a graded test because the teacher realizes she added up the score wrong the first time." },
+  "comparable company": { def: "A similar business, usually in the same industry, used as a benchmark to judge whether a company's numbers or valuation look normal.", analogy: "Comparing your test score to classmates who took the same exam, not to students in a totally different class." },
+  "economic moat": { def: "A durable competitive advantage — like a strong brand, network effect or low costs — that protects a company's profits from competitors.", analogy: "The water-filled ditch around a castle that keeps invaders, or competitors, from storming in and stealing the profits." },
+  "compounding": { def: "Earning returns not just on your original investment, but also on the returns it already generated — growth building on growth.", analogy: "A snowball rolling downhill picks up more snow the bigger it gets, growing faster and faster." },
+  "float": { def: "Money a company, often an insurer, holds temporarily after collecting it but before it must be paid out, which can be invested meanwhile.", analogy: "Holding a friend's deposit for a group trip and investing it briefly before you actually need to pay the hotel." },
+  "impairment": { def: "An accounting write-down that reduces the recorded value of an asset because it's now worth less than what's on the books.", analogy: "Marking down the value of a video game collection in your own budget because a new console made it worth far less." },
+  "contingent liability": { def: "A potential future obligation, like a lawsuit or guarantee, that only becomes real if a specific uncertain event happens.", analogy: "Promising to cover a friend's phone bill only if they lose their job — a debt that might never actually happen." },
+  "auditor's opinion": { def: "An independent accounting firm's formal judgment on whether a company's financial statements fairly represent its financial position.", analogy: "A neutral referee confirming the scoreboard is accurate, rather than just trusting the team's own report of the score." },
+  "going concern": { def: "An auditor's warning that a company may not have enough resources to keep operating for the next year.", analogy: "A doctor telling a patient there's real doubt they can keep working without a serious change." },
+  "treasury stock": { def: "Shares a company has bought back from investors and holds itself, which no longer count as outstanding shares or get a vote.", analogy: "Buying back raffle tickets you already sold — those tickets are out of the drawing and don't count anymore." },
+  "retained earnings": { def: "The total profit a company has kept and reinvested over the years instead of paying it out as dividends.", analogy: "All the allowance you've ever saved instead of spent, piled up in your savings jar." },
+  "convertible debt": { def: "A bond or loan that lenders can choose to convert into company stock instead of being repaid in cash.", analogy: "A loan you can either collect as cash or trade in for a slice of ownership in the business, your choice." },
+  "goodwill impairment": { def: "A write-down that admits an acquired business is now worth less than the premium originally paid for it.", analogy: "Admitting the 'beloved brand' you paid extra for two years ago has lost its shine and isn't worth as much anymore." },
+  "minority interest": { def: "The portion of a subsidiary's profit and equity that belongs to other shareholders, not the parent company that controls it.", analogy: "If you own 80% of a food truck with a partner, their 20% slice of the profit is the minority interest." },
+  "deferred tax": { def: "Taxes that are owed or will be saved in the future because of timing differences between accounting rules and tax rules.", analogy: "A tax bill you know is coming later, or a refund you've already earned but haven't collected yet." },
+  "balance sheet": { def: "A snapshot, at one moment in time, of everything a company owns, everything it owes, and what's left for owners.", analogy: "A photo of your bank balance, debts and net worth taken on one specific day." },
+  "income statement": { def: "A report showing a company's revenue, expenses and profit over a period of time, like a quarter or a year.", analogy: "A movie of your earnings and spending over the school year, not just a single snapshot." },
+  "cash flow statement": { def: "A report tracking how cash actually moved in and out of a company from operating, investing and financing activities.", analogy: "Your bank statement showing every deposit and withdrawal, not just a reported 'profit' number." },
+  "accounts receivable": { def: "Money customers owe a company for goods or services already delivered but not yet paid for.", analogy: "The IOUs your neighbors owe you for mowing their lawns last week." },
+  "accounts payable": { def: "Money a company owes to suppliers for goods or services it has already received but hasn't paid for yet.", analogy: "The tab you owe at the corner store for snacks you already picked up." },
+  "inventory": { def: "Goods a company has made or bought that it hasn't sold to customers yet.", analogy: "The unsold t-shirts still sitting in boxes in the back of the store." },
+  "cost of goods sold": { def: "The direct cost of producing whatever a company actually sold — materials and direct labor, not overhead like marketing.", analogy: "The cost of flour, sugar and eggs in the cupcakes you sold, not the rent on your kitchen." },
+  "sg&a": { def: "Selling, General & Administrative expenses: the costs of running a business not tied directly to making the product, like marketing and office salaries.", analogy: "The cost of the 'open' sign, the cashier's wage and the ads — not the ingredients themselves." },
+  "r&d expense": { def: "Research & Development expense: money spent inventing or improving products and technology, expensed rather than treated as a building or factory.", analogy: "What a company spends on its 'mad scientist lab' trying to invent tomorrow's product." },
+  "operating expenses": { def: "The regular costs of running a business — like rent, salaries and marketing — outside the direct cost of making the product.", analogy: "The bills you pay just to keep the lemonade stand's lights on, tent up and staff paid." },
+  "deferred revenue": { def: "Cash a company has already collected for a product or service it hasn't delivered yet, recorded as a liability until it does.", analogy: "A gift card you sold — you have the cash, but you still owe the customer something in return." },
+  "revenue recognition": { def: "The accounting rules for exactly when a sale counts as earned revenue, which isn't always the moment cash changes hands.", analogy: "Deciding whether a magazine subscription counts as sold all at once, or bit by bit as each issue actually arrives." },
+  "fair value": { def: "An estimate of what an asset would sell for between a willing buyer and seller today, rather than what it originally cost.", analogy: "What your used bike would actually sell for on Craigslist today, not what you paid for it two years ago." },
+  "mark-to-market": { def: "Updating the value of an asset on the books to reflect its current market price, rather than its original purchase price.", analogy: "Re-checking your baseball card collection's worth using today's prices instead of what you paid years ago." },
+  "write-off": { def: "Formally recognizing that an asset's value is now zero, or that a debt owed to the company will never be collected.", analogy: "Finally admitting the $50 a friend borrowed years ago is never coming back, and erasing it from your books." },
+  "one-time charge": { def: "An expense a company labels unusual or non-recurring, like a lawsuit settlement, meant to be excluded when judging normal ongoing performance.", analogy: "A surprise car repair bill you'd leave out when figuring out your normal monthly budget." },
+  "pro forma": { def: "Adjusted financial figures presented as if certain items, like a one-time charge or an acquisition, were handled differently, for illustration.", analogy: "Recalculating your test score as if you hadn't missed that one unfair question." },
+  "segment reporting": { def: "Breaking a company's results down by its different business divisions or geographic regions instead of one combined number.", analogy: "A report card showing your grade in each class instead of just one blended average." },
+  "related party transaction": { def: "A deal between a company and someone connected to it, like an executive or major shareholder, which needs extra scrutiny for fairness.", analogy: "Your school buying supplies from a business owned by the principal's brother — not automatically wrong, but worth checking." },
+  "pension liability": { def: "The estimated amount a company owes current and future retirees under a promised retirement benefit plan.", analogy: "An IOU a company has written to its retired employees, promising to pay them for years to come." },
+  "lease liability": { def: "The obligation a company owes for future rent payments on property or equipment it has committed to lease.", analogy: "The total rent you're on the hook for over a full apartment lease, not just this month's payment." },
+  "quality of earnings": { def: "An assessment of how much reported profit reflects real, repeatable cash generation versus accounting choices or one-time boosts.", analogy: "Judging whether a student's grade came from genuinely learning the material or from lucky guesses on a test." },
+  "channel stuffing": { def: "A tactic where a company pushes extra product onto retailers near quarter-end to inflate reported sales, borrowing from future demand.", analogy: "Convincing your neighbors to buy six months of lemonade today just so this week's sales number looks great." },
+  "audit": { def: "An independent examination of a company's financial statements and records to confirm they're accurate and follow the rules.", analogy: "A health inspector checking a restaurant's kitchen, rather than just trusting the owner's word that it's clean." },
+  "sec filing": { def: "An official document a public company submits to the U.S. Securities and Exchange Commission, part of the public record.", analogy: "A form every public company hands in to a government referee, so anyone can check their homework." },
+  "proxy statement": { def: "A document sent to shareholders before an annual meeting, detailing executive pay, board nominees and matters up for a vote.", analogy: "The ballot and briefing packet mailed to you before a town hall meeting so you know what you're voting on." },
+  "shares outstanding": { def: "The total number of a company's shares currently held by all its investors, including insiders.", analogy: "The total number of raffle tickets that have actually been sold and are still in someone's hands." },
+  "dividend": { def: "A cash payment a company makes to its shareholders, usually out of profit, as a direct reward for owning the stock.", analogy: "A landlord sharing a slice of the rent income with the people who own shares of the building." },
+  "share buyback": { def: "A company using its own cash to repurchase its shares from the market, shrinking the share count.", analogy: "A pizza shop buying back some of the ownership slices it sold, so remaining owners each get a bigger share." },
+  "stock split": { def: "Dividing each existing share into multiple shares, lowering the price per share without changing the company's total value.", analogy: "Cutting a pizza into 8 slices instead of 4 — more pieces, but the same total pizza." },
+  "spin-off": { def: "When a company separates a division into its own independent, publicly traded company, distributing shares of it to existing shareholders.", analogy: "A parent letting a grown child move out and run their own household, while still handing them some starter cash." },
+  "merger and acquisition": { def: "When one company buys another (acquisition) or two companies combine into one (merger).", analogy: "One food truck buying out a rival, or two food trucks joining forces under one new brand." },
+  "synergy": { def: "The extra value expected when two merged companies combine, beyond what each would be worth separately, like shared costs or customers.", analogy: "Two food trucks sharing one kitchen and one delivery van suddenly spend less per burger than either did alone." },
+  "capital allocation": { def: "How a company's leadership decides to deploy its cash — reinvesting, paying dividends, buying back stock, paying down debt or acquiring.", analogy: "How a household decides whether extra income goes to savings, paying off the mortgage, or a vacation." },
+  "capital structure": { def: "The mix of debt and equity a company uses to fund itself.", analogy: "Whether you bought your house mostly with a mortgage, mostly with savings, or some blend of both." },
+  "credit rating": { def: "A grade, issued by agencies like Moody's or S&P, estimating how likely a borrower is to repay its debt on time.", analogy: "Like a personal credit score, but for a company or government instead of a person." },
+  "bond": { def: "A loan an investor makes to a company or government, which promises to pay back the amount plus interest over time.", analogy: "An IOU that pays you interest for lending your money, instead of a bank paying you interest." },
+  "yield curve": { def: "A chart comparing interest rates on bonds of different lengths, from short-term to long-term.", analogy: "Comparing the interest rate on a 1-year savings pledge versus a 10-year one, all in a single picture." },
+  "interest rate": { def: "The cost of borrowing money, or the reward for lending it, usually expressed as a yearly percentage.", analogy: "The 'rent' you pay to use someone else's money, or get paid for letting them use yours." },
+  "inflation": { def: "A general rise in prices over time, which shrinks how much a fixed amount of money can actually buy.", analogy: "The same $20 buying fewer groceries this year than it did five years ago." },
+  "diversification": { def: "Spreading investments across many different companies or assets so no single bad outcome sinks the whole portfolio.", analogy: "Not putting all your eggs in one basket — if you drop one basket, you still have the others." },
+  "index fund": { def: "A fund that simply holds all the stocks in a market index, like the S&P 500, to match the market's return cheaply.", analogy: "Instead of picking a few restaurants, buying a small taste of every restaurant in town at once." },
+  "blue chip": { def: "A large, well-established, financially strong company with a long track record, generally considered a lower-risk stock.", analogy: "The reliable, always-prepared kid in class, versus a flashy newcomer who still has something to prove." },
+  "cyclical stock": { def: "A stock whose profits rise and fall closely with the broader economy, like carmakers or airlines.", analogy: "A business that booms when everyone's spending freely and struggles when people tighten their belts, like a resort." },
+  "defensive stock": { def: "A stock in an industry, like groceries or utilities, whose sales hold up fairly steadily even in a weak economy.", analogy: "People still buy toothpaste and electricity even when times are tough, unlike vacations or new cars." },
+  "value trap": { def: "A stock that looks cheap by the numbers but stays cheap, or gets cheaper, because the underlying business is genuinely deteriorating.", analogy: "A discounted carton of milk that's actually gone sour — the low price isn't a bargain, it's a warning." },
+  "value investing": { def: "An approach that buys stocks trading below a careful estimate of their true worth, aiming to profit as that gap closes.", analogy: "Shopping the clearance rack for genuinely good items, not just anything with a low price tag." },
+  "growth investing": { def: "An approach that buys stocks expected to grow revenue and profit rapidly, often paying a higher price today for that future growth.", analogy: "Paying extra for a young athlete's rookie card because you believe they're about to become a superstar." },
+  "small cap": { def: "A publicly traded company with a relatively small total market value, often higher-risk but with more room to grow.", analogy: "A neighborhood shop with room to expand nationwide, versus a chain that already has a store on every corner." },
+  "large cap": { def: "A publicly traded company with a large total market value, generally more established and often more stable.", analogy: "A household-name chain that's already on nearly every corner, versus a single local shop." },
+  "volatility": { def: "How much and how quickly a stock's price swings up and down over time.", analogy: "A calm lake versus choppy ocean waves — both can get you somewhere, but one ride is much bumpier." },
+  "beta": { def: "A number measuring how much a stock tends to move compared to the overall market — above 1 means bigger swings, below 1 smaller.", analogy: "A rollercoaster car (high beta) swings harder than a gentle train ride (low beta) as the whole park's mood shifts." },
+  "bear market": { def: "A period, usually defined as a 20%+ drop, of falling stock prices and widespread investor pessimism.", analogy: "A long, gray winter for stock prices — cold, discouraging, and it can drag on for a while." },
+  "bull market": { def: "A period of rising stock prices and generally optimistic investor sentiment.", analogy: "A long summer stretch where the whole neighborhood's lemonade stands are thriving." },
+  "insider ownership": { def: "The percentage of a company's shares held by its executives, directors and other insiders.", analogy: "How much of the restaurant the head chef personally owns versus just managing it for someone else." },
+  "institutional ownership": { def: "The percentage of a company's shares held by large organizations like mutual funds, pensions and banks rather than individual investors.", analogy: "Whether a neighborhood is mostly owned by big landlords or by the individual families living there." },
+  "short selling": { def: "Borrowing and selling a stock you don't own, betting its price will fall so you can buy it back cheaper later.", analogy: "Borrowing a friend's bike, selling it, hoping the price drops so you can buy an identical one back for less." },
+  "risk tolerance": { def: "How much loss or uncertainty an investor is personally willing and able to stomach in pursuit of returns.", analogy: "Whether you're comfortable on the tallest rollercoaster in the park, or you'd rather stick to the merry-go-round." },
+  "time horizon": { def: "How long an investor plans to hold an investment before needing the money back.", analogy: "Saving for a car you'll buy next year versus saving for retirement decades away — very different games." },
+  "circle of competence": { def: "The areas of business and industry an investor genuinely understands well enough to judge with real confidence.", analogy: "Sticking to fixing bikes you actually know how to repair, instead of guessing at a car engine." },
+  "mr. market": { def: "A metaphor for the stock market as a moody business partner who offers you a different price every day, whether it makes sense or not.", analogy: "A jumpy classmate who offers to buy or sell his baseball cards at a wildly different price every single day." },
 };
 
 let tooltipEl = null;
@@ -34,6 +148,11 @@ export function initGlossary() {
   document.addEventListener("mouseover", handleHover);
   document.addEventListener("mouseout", handleOut);
   document.addEventListener("click", handleTapMobile);
+  // Keyboard-only users can't hover, so mirror the mouse handlers on
+  // focus/blur — `.term` spans are made focusable via tabindex in term().
+  document.addEventListener("focus", handleFocus, true);
+  document.addEventListener("blur", handleBlur, true);
+  document.addEventListener("keydown", handleKeydown);
 }
 
 function lookup(key) {
@@ -68,6 +187,24 @@ function handleOut(e) {
   if (target) hideTooltip();
 }
 
+function handleFocus(e) {
+  const target = e.target.closest?.(".term");
+  if (!target) return;
+  const entry = lookup(target.dataset.term || target.textContent);
+  if (entry) showTooltip(target, entry);
+}
+
+function handleBlur(e) {
+  const target = e.target.closest?.(".term");
+  if (target) hideTooltip();
+}
+
+function handleKeydown(e) {
+  if (e.key === "Escape" && !tooltipEl.classList.contains("hidden")) {
+    hideTooltip();
+  }
+}
+
 function handleTapMobile(e) {
   const target = e.target.closest(".term");
   if (!target) {
@@ -86,5 +223,5 @@ function handleTapMobile(e) {
 export function term(label, key) {
   const lookupKey = (key || label).toLowerCase();
   if (!GLOSSARY[lookupKey]) return label;
-  return `<span class="term" data-term="${lookupKey}">${label}</span>`;
+  return `<span class="term" data-term="${lookupKey}" tabindex="0" role="button" aria-describedby="glossary-tooltip">${label}</span>`;
 }
