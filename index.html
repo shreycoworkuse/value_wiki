@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Value Wiki — read a company like an investigative journalist</title>
+<meta name="description" content="Free, no-login dashboard for learning value investing. Type a US ticker and get a 20-year investigative dossier built live from public SEC filings — no signup, no database, nothing stored on any server." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="./">📖 Value&nbsp;Wiki</a>
+    <form id="search-form" class="search-form" autocomplete="off">
+      <input id="search-input" type="text" placeholder="Search a US ticker or company… (e.g. AAPL, Coca-Cola)" aria-label="Search ticker or company" />
+      <div id="search-results" class="search-results hidden" role="listbox"></div>
+      <button type="submit">Open dossier</button>
+    </form>
+    <button id="theme-toggle" class="icon-btn" title="Toggle light/dark" aria-label="Toggle theme">🌓</button>
+  </div>
+</header>
+
+<main id="app">
+  <section id="view-landing" class="view">
+    <div class="landing-hero">
+      <h1>Read a company like an investigative journalist.<br>Understand it like a CFA.<br>In the language of a smart 15-year-old.</h1>
+      <p class="lede">Type any US-listed ticker. We pull up to 20 years of its own regulatory filings straight from the SEC — live, in your browser — and turn the numbers into a story: what grew, what broke, where the cash really went, and an owner's-checklist verdict. No login. No servers holding your data. Nothing to sign up for.</p>
+      <div class="example-chips">
+        <span>Try:</span>
+        <button class="chip" data-ticker="AAPL">AAPL</button>
+        <button class="chip" data-ticker="KO">KO</button>
+        <button class="chip" data-ticker="MSFT">MSFT</button>
+        <button class="chip" data-ticker="JNJ">JNJ</button>
+        <button class="chip" data-ticker="WMT">WMT</button>
+      </div>
+    </div>
+    <div class="landing-notes">
+      <div class="note-card">
+        <h3>What this is</h3>
+        <p>A search-engine-style dashboard for learning value investing: pick a company, read its 20-year story in plain language, and see exactly where every number came from.</p>
+      </div>
+      <div class="note-card">
+        <h3>What this deliberately isn't</h3>
+        <p>No trading signals, no price targets, no buy/sell buttons, no brokerage hookup. Every formula is hidden by default behind a "How we got this" drawer — this is a research tool, not investment advice.</p>
+      </div>
+      <div class="note-card">
+        <h3>How it stays free</h3>
+        <p>Every figure is fetched on the fly, in your browser, directly from the SEC's free public EDGAR API — the same filings source anyone can query with no key and no account. Nothing is cached on a server or database; close the tab and there's nothing left behind.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-dossier" class="view hidden">
+    <div id="dossier-status" class="dossier-status"></div>
+    <div id="dossier-content" class="hidden">
+
+      <div class="dossier-head">
+        <div>
+          <h1 id="dossier-name">—</h1>
+          <div id="dossier-meta" class="dossier-meta"></div>
+        </div>
+        <div class="dossier-actions">
+          <label class="price-input-label">Current share price (optional, for valuation)
+            <input id="price-input" type="number" min="0" step="0.01" placeholder="e.g. 150.00" />
+          </label>
+          <button id="export-csv" class="ghost-btn">Export KPI table (CSV)</button>
+        </div>
+      </div>
+
+      <nav id="tabs" class="tabs" role="tablist"></nav>
+
+      <div id="tab-panels"></div>
+
+    </div>
+  </section>
+</main>
+
+<div id="glossary-tooltip" class="glossary-tooltip hidden" role="tooltip"></div>
+
+<footer class="site-footer">
+  <p>Value Wiki is an educational research tool, not personalized financial advice. Figures are sourced live from SEC EDGAR filings; verify anything important against the primary filing before relying on it. No accounts, no tracking, no server-side data storage.</p>
+</footer>
+
+<script src="vendor/chart.umd.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
