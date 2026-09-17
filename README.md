@@ -40,21 +40,73 @@ and an LLM extraction pipeline. That's the opposite of "free, no login,
 run-on-the-fly," so this build intentionally implements a lighter concept
 that stays true to the free/no-login/no-storage brief instead:
 
-**Included:** ticker search, a cover-story summary, 8 core KPI charts
-(revenue, net income, margins, ROE/ROA, debt-to-equity, free cash flow),
-a "follow the money" cash-flow table, automated rule-based red-flag checks,
-an 8-question owner's checklist verdict (explicitly *not* a buy/sell signal),
-a simple owner-earnings-based valuation range with a margin-of-safety gauge,
-dotted-underline glossary tooltips for ~25 financial terms, direct links to
-the primary SEC filings behind every number, and CSV export of the KPI table.
+**Included** — 10 tabs, all computed live client-side from SEC filings:
+- **Cover story** — headline facts + a mechanically generated summary
+- **KPI chapters** — 30 KPI cards across all 8 of the PRD's categories
+  (growth, profitability, returns, cash, balance sheet, efficiency, owner
+  returns, and a deliberately thin "valuation context" — see `js/kpi-library.js`
+  for why), each with a chart, trend verdict, and progressive depth
+  (Headline → collapsed "Explain" → collapsed "CFA detail"), plus a
+  Story-mode/Analyst-mode reading toggle and a per-chart PNG download
+- **Stories** — 12 combined two-KPI overlay charts with a rule-based
+  (not AI-written) narrative sentence per pairing
+- **Follow the money** — cash-flow chart + full annual figures table
+- **Timeline** — an auto-generated, rule-based chronological narrative built
+  only from filing data (see below for why it's not a price chart)
+- **Track Record** — filing consistency, growth/margin volatility and
+  loss-year history (a deliberately honest stand-in for "future plans
+  vs. delivered" — see below)
+- **Verdict** — an 8-question owner's checklist (explicitly *not* a buy/sell
+  signal) plus any automated red flags
+- **What is it worth** — owner-earnings-multiple range, a 3-scenario DCF, and
+  a book-value-compounding projection (3 of the PRD's 5 valuation methods;
+  sum-of-parts/NAV were investigated and ruled out — see `js/valuation.js`),
+  a margin-of-safety gauge against a price you type in, and full-dossier PDF
+  export (browser print) alongside the KPI-table CSV export
+- **Compare** — manual two-ticker side-by-side (not auto peer-ranking — see
+  below)
+- **Sources** — direct links to the primary filings, a confidence legend
+  distinguishing directly-reported figures from computed estimates, and a
+  "report an error" link to this repo's GitHub issues (which doubles as a
+  free, honest public corrections log)
 
-**Left out** (all of it would require a paid data source, a login system, or
-persistent server-side storage — a real product decision, not derivable from
-"make it free and run on the fly"): lawsuits/regulatory/court records,
-management/people profiles, competitor comparison grids, live price ticking,
-saved notebooks and alerts, PDF export, non-US companies (SEC EDGAR is
-US-only), and the "point-in-time / time travel" mode (it needs figures stored
-with historical publication dates, i.e. a database).
+Plus: 140+ glossary terms with hover/tap/keyboard-focusable definitions, a
+dismissible first-run tour, WCAG AA-audited color contrast and keyboard
+navigation (tabs, glossary tooltips), and richer live progress messages
+while a dossier loads.
+
+**Deliberately scoped down rather than faked**, each investigated on its own
+merits rather than assumed impossible:
+- **Competitors → Compare tab.** SEC's per-company `submissions.json` does
+  carry an industry code, but finding *other* companies sharing it needs a
+  bulk SIC index SEC doesn't expose for free in one file. Auto peer-ranking
+  was ruled out; the Compare tab lets you pick the second company yourself.
+- **Timeline → narrative timeline, not a price chart.** No free, keyless,
+  CORS-friendly historical price API exists (we already had to build our own
+  CORS proxy just for SEC's own data), and macro data needs a keyed API like
+  FRED. The Timeline tab tells the story from filing data alone instead.
+- **Future plans → Track Record tab.** Forward guidance is free-text
+  MD&A/earnings-call prose, never a structured XBRL tag — there's no free,
+  comparable source for it. The Track Record tab reports filing/growth/margin
+  *consistency* instead, and says explicitly that it isn't guidance-tracking.
+- **Sum-of-parts / NAV valuation.** SEC XBRL segment reporting uses each
+  filer's own custom, non-standardized tags — reliably reading it would mean
+  per-company hand-curated mappings, which this project avoids everywhere
+  else. Ruled out rather than shipped with fabricated segment splits.
+- **Sector packs** (bank/REIT/insurer-specific KPIs). Investigated and found
+  feasible for exactly one sector (banks — `us-gaap:InterestIncomeExpenseNet`
+  etc. are standardized; REIT FFO and insurer combined-ratio figures are not).
+  Built in `js/sector-packs.js` but **not yet wired in** — it needs the
+  Cloudflare Worker's allow-list extended to SEC's `submissions.json`
+  endpoint and a redeploy first; see the file's own integration notes.
+
+**Still genuinely out of scope** (would need a paid data source, a login
+system, or persistent server-side storage — a real product decision, not
+derivable from "make it free and run on the fly"): lawsuits/regulatory/court
+records, management/people profiles, live price ticking, saved notebooks and
+alerts, non-US companies (SEC EDGAR is US-only), and the "point-in-time /
+time travel" mode (it needs figures stored with historical publication
+dates, i.e. a database).
 
 ## Running it locally
 
@@ -141,7 +193,10 @@ run.
    table — no AI, no hidden model, no price target.
 4. `js/valuation.js` computes book value and a wide owner-earnings-based
    intrinsic value range, optionally compared against a price you type in.
-5. `js/ui.js` and `js/charts.js` render all of the above into the dossier's
-   tabs using the vendored Chart.js.
+5. `js/ui.js` and `js/charts.js` render the core tabs; `js/stories.js`,
+   `js/timeline.js`, `js/execution.js`, `js/compare.js` and
+   `js/valuation-extra.js` render the rest — all following the same
+   fixed-rule, no-AI, no-fabricated-data approach, using the vendored
+   Chart.js.
 
 Everything above runs client-side, in the visitor's own browser.

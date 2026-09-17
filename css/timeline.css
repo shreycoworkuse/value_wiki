@@ -1,0 +1,76 @@
+/* Timeline tab — a simple vertical rail + dot per fiscal year, reusing the
+   app's existing CSS custom properties (see :root / [data-theme="dark"] in
+   css/style.css) so it matches the light/dark theme automatically. */
+
+.timeline {
+  position: relative;
+  margin: 18px 0 0;
+  padding-left: 26px;
+  border-left: 2px solid var(--border);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 26px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 2px;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -32px;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.timeline-dot.neutral {
+  background: var(--text-muted);
+}
+
+.timeline-year {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.timeline-headline {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin: 2px 0 8px;
+}
+
+.timeline-captions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-caption {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.timeline-caption.tone-good { border-left-color: var(--good); }
+.timeline-caption.tone-watch { border-left-color: var(--watch); }
+.timeline-caption.tone-flag { border-left-color: var(--flag); }
+.timeline-caption.tone-neutral {
+  color: var(--text-muted);
+  font-style: italic;
+  border-left-color: var(--border);
+}
+
+@media (max-width: 640px) {
+  .timeline { padding-left: 20px; }
+  .timeline-dot { left: -26px; }
+}

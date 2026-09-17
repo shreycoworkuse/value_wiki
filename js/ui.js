@@ -1,30 +1,12 @@
-import { formatMoney, formatMoneyShort, formatPercent, renderLineChart } from "./charts.js";
+import { formatMoney, formatMoneyShort, formatPercent, formatRatio, renderLineChart, downloadChartPNG } from "./charts.js";
 import { cagr, lastValid } from "./kpis.js";
+import { KPI_DEFINITIONS, CATEGORIES } from "./kpi-library.js";
 import { detectRedFlags, trendVerdict } from "./redflags.js";
 import { buildChecklist } from "./verdict.js";
 import { computeValuation } from "./valuation.js";
 import { term } from "./glossary.js";
 import { filingIndexUrl } from "./sec.js";
-
-const KPI_LIST = [
-  { key: "revenue", label: "Revenue", raw: true, currency: true },
-  { key: "netIncome", label: "Net income", raw: true, currency: true },
-  { key: "operatingMargin", label: "Operating margin", raw: false, currency: false },
-  { key: "netMargin", label: "Net margin", raw: false, currency: false },
-  { key: "roe", label: "Return on equity (ROE)", raw: false, currency: false },
-  { key: "roa", label: "Return on assets (ROA)", raw: false, currency: false },
-  { key: "debtToEquity", label: "Debt-to-equity", raw: false, currency: false },
-  { key: "freeCashFlow", label: "Free cash flow", raw: false, currency: true },
-];
-
-const KPI_TERM_KEY = {
-  "Operating margin": "operating margin",
-  "Net margin": "net margin",
-  "Return on equity (ROE)": "roe",
-  "Return on assets (ROA)": "roa",
-  "Debt-to-equity": "debt-to-equity",
-  "Free cash flow": "free cash flow",
-};
+import { confidenceLegend, estimateMark, reportErrorLink } from "./trust.js";
 
 function el(html) {
   const div = document.createElement("div");
@@ -32,14 +14,83 @@ function el(html) {
   return div.firstElementChild;
 }
 
-function headlineSentence(label, arr, years, currency) {
+function headlineValue(kind, v) {
+  if (kind === "currency") return formatMoneyShort(v);
+  if (kind === "ratio") return formatRatio(v);
+  return formatPercent(v);
+}
+
+function chartAriaLabel(label, years, arr, kind) {
+  if (!years.length) return `Line chart of ${label}, no data reported.`;
+  const last = lastValid(arr);
+  const span = `${years[0]} to ${years[years.length - 1]}`;
+  const valueTxt = last ? headlineValue(kind, last.value) : "no data reported";
+  return `Line chart of ${label} from ${span}, latest value ${valueTxt}.`;
+}
+
+function setChartA11y(canvas, label, years, arr, kind) {
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", chartAriaLabel(label, years, arr, kind));
+}
+
+function headlineSentence(label, arr, years, kind) {
   const last = lastValid(arr);
   if (!last) return `${label}: no data reported.`;
-  const val = currency ? formatMoneyShort(last.value) : formatPercent(last.value);
+  const val = headlineValue(kind, last.value);
   const g = cagr(arr, years);
   const growthTxt = g !== null ? `, ${g >= 0 ? "up" : "down"} about ${Math.abs(g * 100).toFixed(1)}%/yr over the covered period` : "";
   return `Most recently (FY${years[last.index]}): ${val}${growthTxt}.`;
 }
+
+// --- Progressive depth content (level 2 "Explain" + level 3 "CFA detail") ---
+// Plain-language, metric-specific context built from this company's own
+// trend verdict and latest value — not generic boilerplate. The 8 original
+// KPIs get a hand-written branch; the rest fall through to a still-specific
+// (not generic-filler) sentence built from the metric's own label/category.
+function explainText(kpi, verdict, last, companyName) {
+  const name = companyName || "this company";
+  const val = last ? headlineValue(kpi.kind, last.value) : null;
+  const trend = verdict.label.toLowerCase();
+  switch (kpi.key) {
+    case "revenue":
+      return `Revenue is the total sales ${name} booked in a fiscal year, before any costs, interest or taxes are subtracted. At ${val ?? "an unreported level"}, the multi-year trend is ${trend} — that tells you whether the underlying business is getting bigger or smaller in the eyes of its customers.`;
+    case "netIncome":
+      return `Net income is what's left for shareholders after every expense, interest payment and tax bill is paid. ${name} reported ${val ?? "no usable figure"} most recently, and the trend across the covered years is ${trend} — that matters more than any single year, since one-off gains or charges can make a single year misleading.`;
+    case "operatingMargin":
+      return `Operating margin shows how much of every sales dollar ${name} keeps as profit before interest and taxes. The trend is ${trend}, so ${verdict.cls === "flag" ? "the business is keeping a shrinking slice of each sale — costs or discounting are eating into profitability" : verdict.cls === "good" ? "the business is keeping a growing slice of each sale" : "the picture is mixed, worth watching rather than acting on"}.`;
+    case "netMargin":
+      return `Net margin is the share of every sales dollar ${name} keeps as final profit, after interest and taxes. It's ${trend} — ${verdict.cls === "flag" ? "a shrinking share, which usually means costs, competition or interest expense are growing faster than sales" : "worth tracking alongside operating margin to see if a squeeze (or improvement) is coming from the core business or from financing/tax items"}.`;
+    case "roe":
+      return `Return on equity shows how much profit ${name} generates for every dollar shareholders have invested in the business.${val ? ` At ${val},` : ""} the trend is ${trend} — a rising ROE can come from genuinely better performance, but it can also come from taking on more debt, so it's worth reading alongside debt-to-equity.`;
+    case "roa":
+      return `Return on assets shows how efficiently ${name} turns everything it owns — cash, inventory, equipment, everything on the balance sheet — into profit. Unlike ROE, it isn't inflated by leverage, so it's a cleaner read on operating efficiency. The trend here is ${trend}.`;
+    case "debtToEquity":
+      return `Debt-to-equity compares what ${name} owes in long-term debt against what shareholders have invested.${val ? ` At ${val},` : ""} leverage here is ${trend} — more debt magnifies both gains and losses for equity holders, and raises the risk if earnings dip.`;
+    case "freeCashFlow":
+      return `Free cash flow is the cash ${name} has left over after running the business and paying for the equipment/property it needs to keep running it — the pool of real cash available to pay down debt, buy back stock, pay dividends, or reinvest. The trend is ${trend}.`;
+    default: {
+      const cat = (kpi.category || "").toLowerCase();
+      return `${kpi.label} is one of ${name}'s ${cat || "filed"} figures.${val ? ` Most recently: ${val}.` : ""} The multi-year trend here is ${trend} — read it alongside the other cards in this category rather than on its own, since any single ratio can look fine (or alarming) in isolation.`;
+    }
+  }
+}
+
+const KPI_CFA_DETAIL = {
+  revenue: { note: "Revenue is taken directly from the company's reported US-GAAP revenue tag (ASC 606) in its 10-K XBRL — no adjustments are made here." },
+  netIncome: { note: "Net income is the as-reported GAAP bottom line — no adjustment for one-time items, discontinued operations, or non-GAAP add-backs the company itself might report separately." },
+  operatingMargin: { formula: "operating margin = operating income ÷ revenue", note: "Operating income excludes interest and taxes but includes all operating costs; depreciation/amortization policy differences between companies are not normalized here." },
+  netMargin: { formula: "net margin = net income ÷ revenue", note: "Includes the effects of interest expense, taxes and any one-off gains or charges embedded in reported net income — not adjusted for non-recurring items." },
+  roe: { formula: "ROE = net income ÷ stockholders' equity (period-end)", note: "Uses period-end equity rather than an average of beginning and ending equity, so a large buyback, share issuance, or write-down late in the year can distort a single year's figure." },
+  roa: { formula: "ROA = net income ÷ total assets (period-end)", note: "Like ROE here, this uses a point-in-time asset balance rather than an average — a large acquisition or disposal near year-end can skew it." },
+  roic: { formula: "ROIC ≈ NOPAT ÷ (equity + long-term debt − cash)", note: "NOPAT is approximated from operating income and an implied effective tax rate — a simplification, not a precise capital-structure-adjusted calculation." },
+  roce: { formula: "ROCE = operating income ÷ (assets − current liabilities)", note: "A pre-tax, leverage-aware cousin of ROIC that avoids estimating a tax rate." },
+  debtToEquity: { formula: "debt-to-equity = long-term debt ÷ stockholders' equity", note: "Uses long-term debt only, not total liabilities or short-term borrowings, so it can understate leverage for companies that rely heavily on short-term or off-balance-sheet financing." },
+  freeCashFlow: { formula: "free cash flow = operating cash flow − capital expenditures", note: "This is the standard simple definition. It doesn't add back stock-based compensation or subtract lease payments the way some analysts' \"adjusted FCF\" does." },
+  currentRatio: { formula: "current ratio = current assets ÷ current liabilities", note: "A ratio above 1 suggests near-term bills are covered by near-term resources; it doesn't check how liquid those current assets actually are (e.g. slow-moving inventory)." },
+  netDebt: { formula: "net debt = long-term debt − cash and equivalents", note: "Excludes short-term/current debt, since that tag isn't collected by this tool; can understate total leverage for companies with heavy short-term borrowing." },
+  cashConversion: { formula: "cash conversion = operating cash flow ÷ net income", note: "Left blank in loss years, since the ratio stops being meaningful when net income is zero or negative." },
+};
+const DEFAULT_CFA_NOTE = "Computed on the fly from the raw SEC XBRL figures for this company using a fixed, published formula — the same calculation is applied to every company, with no per-ticker adjustments.";
 
 export function renderCoverStory(container, { company, base, derived, redFlags, checklist }) {
   const years = base.years;
@@ -67,29 +118,84 @@ export function renderCoverStory(container, { company, base, derived, redFlags, 
   `));
 }
 
-export function renderKpiGrid(container, { base, derived }) {
+export function renderKpiGrid(container, { company, base, derived }) {
   container.innerHTML = "";
+  container.append(el(confidenceLegend()));
+
+  // Story mode (narrative, one column) vs Analyst mode (dense grid, default).
+  // Layout lives entirely in css/reading-mode.css; here we only toggle a
+  // class and remember the choice.
+  let mode = "analyst";
+  try { mode = localStorage.getItem("kpiReadingMode") === "story" ? "story" : "analyst"; } catch (_) { /* per-viewer convenience only */ }
+  const modeToggle = el(`
+    <div class="reading-mode-toggle" role="group" aria-label="Reading mode">
+      <button type="button" class="mode-btn" data-mode="analyst">Analyst mode</button>
+      <button type="button" class="mode-btn" data-mode="story">Story mode</button>
+    </div>
+  `);
+  container.append(modeToggle);
+
   const grid = el(`<div class="kpi-grid"></div>`);
   container.append(grid);
 
-  for (const kpi of KPI_LIST) {
-    const arr = kpi.raw ? base.series[kpi.key] : derived[kpi.key];
-    const verdict = trendVerdict(arr);
-    const last = lastValid(arr);
-    const termKey = KPI_TERM_KEY[kpi.label];
-    const card = el(`
-      <div class="kpi-card">
-        <div class="kpi-card-head">
-          <h3>${termKey ? term(kpi.label, termKey) : kpi.label}</h3>
-          <span class="trend-chip trend-${verdict.cls}">${verdict.label}</span>
+  function applyMode(m) {
+    grid.classList.toggle("story-mode", m === "story");
+    modeToggle.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  }
+  applyMode(mode);
+  modeToggle.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mode-btn");
+    if (!btn) return;
+    applyMode(btn.dataset.mode);
+    try { localStorage.setItem("kpiReadingMode", btn.dataset.mode); } catch (_) { /* per-viewer convenience only */ }
+  });
+
+  const ticker = company?.ticker || "company";
+  for (const category of CATEGORIES) {
+    const kpisInCategory = KPI_DEFINITIONS.filter((k) => k.category === category);
+    if (!kpisInCategory.length) continue;
+    grid.append(el(`<h3 class="kpi-category-heading" style="grid-column:1/-1; margin:28px 0 4px; font-size:1.05rem;">${category}</h3>`));
+
+    for (const kpi of kpisInCategory) {
+      const arr = kpi.raw ? base.series[kpi.key] : derived[kpi.key];
+      const verdict = trendVerdict(arr);
+      const last = lastValid(arr);
+      const card = el(`
+        <div class="kpi-card">
+          <div class="kpi-card-head">
+            <h3>${kpi.termKey ? term(kpi.label, kpi.termKey) : kpi.label}</h3>
+            <div class="kpi-card-head-right" style="display:flex; align-items:center; gap:6px;">
+              <span class="trend-chip trend-${verdict.cls}">${verdict.label}</span>
+              <button type="button" class="icon-btn kpi-download-btn" style="padding:3px 7px; font-size:0.78rem; line-height:1;" title="Download this chart as PNG" aria-label="Download ${kpi.label} chart as PNG">⬇</button>
+            </div>
+          </div>
+          <div class="kpi-headline">${headlineSentence(kpi.label, arr, base.years, kpi.kind)}</div>
+          <div class="kpi-chart-wrap"><canvas></canvas></div>
         </div>
-        <div class="kpi-headline">${headlineSentence(kpi.label, arr, base.years, kpi.currency)}</div>
-        <div class="kpi-chart-wrap"><canvas></canvas></div>
-      </div>
-    `);
-    grid.append(card);
-    const canvas = card.querySelector("canvas");
-    requestAnimationFrame(() => renderLineChart(canvas, base.years, arr, { currency: kpi.currency }));
+      `);
+      grid.append(card);
+      const canvas = card.querySelector("canvas");
+      setChartA11y(canvas, kpi.label, base.years, arr, kpi.kind);
+      requestAnimationFrame(() => renderLineChart(canvas, base.years, arr, { kind: kpi.kind }));
+
+      const slug = kpi.label.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+      card.querySelector(".kpi-download-btn").addEventListener("click", () => downloadChartPNG(canvas, `${ticker}-${slug}.png`));
+
+      const cfa = KPI_CFA_DETAIL[kpi.key] || {};
+      card.append(el(`
+        <details class="how-we-got-this kpi-explain">
+          <summary>Explain</summary>
+          <p>${explainText(kpi, verdict, last, company?.name)}</p>
+        </details>
+      `));
+      card.append(el(`
+        <details class="how-we-got-this kpi-cfa-detail">
+          <summary>CFA detail</summary>
+          ${cfa.formula ? `<div class="formula">${cfa.formula}</div>` : ""}
+          <p>${cfa.note || DEFAULT_CFA_NOTE}</p>
+        </details>
+      `));
+    }
   }
 }
 
@@ -112,6 +218,7 @@ export function renderFollowTheMoney(container, { base, derived }) {
   `);
   container.append(wrap);
   const canvas = wrap.querySelector("#fcf-canvas");
+  setChartA11y(canvas, "Free cash flow", base.years, derived.freeCashFlow, "currency");
   requestAnimationFrame(() => renderLineChart(canvas, base.years, derived.freeCashFlow, { currency: true }));
 
   const rows = [
@@ -173,12 +280,13 @@ export function renderValuation(container, { base, derived, price }) {
 
   container.append(el(`
     <div>
+      ${confidenceLegend({ context: "valuation" })}
       <div class="val-grid">
-        <div class="val-card"><div class="val-label">${term("book value", "book value")} / share</div><div class="val-value">${v.bookValuePerShare !== null ? "$" + v.bookValuePerShare.toFixed(2) : "—"}</div></div>
-        <div class="val-card"><div class="val-label">${term("owner earnings", "owner earnings")} / share (5yr avg)</div><div class="val-value">${v.ownerEarningsPerShare !== null ? "$" + v.ownerEarningsPerShare.toFixed(2) : "—"}</div></div>
-        <div class="val-card"><div class="val-label">Estimated ${term("intrinsic value", "intrinsic value")} range</div><div class="val-value">${v.intrinsicLow !== null ? `$${v.intrinsicLow.toFixed(0)}–$${v.intrinsicHigh.toFixed(0)}` : "—"}</div></div>
-        <div class="val-card"><div class="val-label">${term("p/e ratio", "p/e ratio")}</div><div class="val-value">${v.pe !== null ? v.pe.toFixed(1) + "x" : "enter a price →"}</div></div>
-        <div class="val-card"><div class="val-label">${term("p/b ratio", "p/b ratio")}</div><div class="val-value">${v.pb !== null ? v.pb.toFixed(2) + "x" : "enter a price →"}</div></div>
+        <div class="val-card"><div class="val-label">${term("book value", "book value")} / share</div><div class="val-value">${v.bookValuePerShare !== null ? "$" + v.bookValuePerShare.toFixed(2) : "—"}${estimateMark()}</div></div>
+        <div class="val-card"><div class="val-label">${term("owner earnings", "owner earnings")} / share (5yr avg)</div><div class="val-value">${v.ownerEarningsPerShare !== null ? "$" + v.ownerEarningsPerShare.toFixed(2) : "—"}${estimateMark()}</div></div>
+        <div class="val-card"><div class="val-label">Estimated ${term("intrinsic value", "intrinsic value")} range</div><div class="val-value">${v.intrinsicLow !== null ? `$${v.intrinsicLow.toFixed(0)}–$${v.intrinsicHigh.toFixed(0)}` : "—"}${estimateMark()}</div></div>
+        <div class="val-card"><div class="val-label">${term("p/e ratio", "p/e ratio")}</div><div class="val-value">${v.pe !== null ? v.pe.toFixed(1) + "x" : "enter a price →"}${v.pe !== null ? estimateMark({ label: "Computed from your entered price — not itself reported by the company" }) : ""}</div></div>
+        <div class="val-card"><div class="val-label">${term("p/b ratio", "p/b ratio")}</div><div class="val-value">${v.pb !== null ? v.pb.toFixed(2) + "x" : "enter a price →"}${v.pb !== null ? estimateMark({ label: "Computed from your entered price — not itself reported by the company" }) : ""}</div></div>
       </div>
 
       <div class="kpi-card">
@@ -207,12 +315,14 @@ export function renderSources(container, { company }) {
   container.innerHTML = "";
   container.append(el(`
     <div>
+      ${confidenceLegend()}
       <p>Every figure in this dossier was read directly from ${company.name}'s own filings with the U.S. Securities and Exchange Commission, fetched live from SEC EDGAR's free public API — nothing here is estimated, scraped from a paid data vendor, or cached on a server.</p>
       <div class="sources-list">
         <a href="${filingIndexUrl(company.cik)}" target="_blank" rel="noopener">→ Browse all 10-K annual filings for ${company.ticker} on SEC EDGAR</a>
         <a href="https://data.sec.gov/api/xbrl/companyfacts/CIK${company.cik}.json" target="_blank" rel="noopener">→ Raw XBRL company-facts JSON this dossier was built from</a>
         <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${parseInt(company.cik, 10)}&type=10-K" target="_blank" rel="noopener">→ SEC EDGAR company filing browser</a>
       </div>
+      ${reportErrorLink()}
     </div>
   `));
 }

@@ -1,0 +1,49 @@
+/* First-run guided tour banner (js/tour.js). Reuses the app's existing
+   editorial tokens from css/style.css's :root — no new colors defined. */
+
+.tour-banner {
+  position: relative;
+  max-width: 640px;
+  margin: 0 auto 28px;
+  padding: 16px 40px 16px 18px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.tour-banner p {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.tour-banner p:last-child { margin-bottom: 0; }
+.tour-banner strong { font-family: var(--serif); }
+
+.tour-sample-term {
+  border-bottom: 1px dotted var(--accent);
+  cursor: help;
+}
+
+.tour-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.tour-dismiss:hover { color: var(--text); background: rgba(0, 0, 0, 0.06); }
+:root[data-theme="dark"] .tour-dismiss:hover { background: rgba(255, 255, 255, 0.08); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tour-dismiss:hover { background: rgba(255, 255, 255, 0.08); }
+}
+
+@media (max-width: 640px) {
+  .tour-banner { margin-left: 16px; margin-right: 16px; }
+}

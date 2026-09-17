@@ -1,0 +1,101 @@
+/* Print stylesheet — "Export full dossier (PDF)" uses the browser's native
+   print-to-PDF (window.print()), so this is the entire PDF export engine.
+   No PDF library, no server, always works. */
+
+@media print {
+  /* --- Chrome around the dossier: hide anything that isn't dossier content --- */
+  .site-header,
+  #glossary-tooltip,
+  .dossier-actions,
+  #tabs {
+    display: none !important;
+  }
+
+  /* --- Show every tab's content, not just the currently-active one ---
+     js/main.js's setActiveTab toggles this exact selector to switch tabs
+     on screen; for print we force every panel visible so the full dossier
+     comes out in one document. */
+  .tab-panel.hidden {
+    display: block !important;
+  }
+
+  /* --- Page-break hints: start each tab on its own page --- */
+  .tab-panel {
+    page-break-before: always;
+    break-before: page;
+  }
+  .tab-panel:first-of-type {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+  .tab-panel,
+  .kpi-card,
+  .fact-card,
+  .val-card,
+  .checklist-item {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Label each printed section with the tab it came from, since the tab
+     nav itself is hidden on paper. */
+  .tab-panel::before {
+    content: "Section: " attr(data-panel);
+    display: block;
+    text-transform: capitalize;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: #555;
+    margin-bottom: 10px;
+  }
+
+  /* --- Readable in black-and-white / grayscale printing --- */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  html, body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  #view-dossier {
+    max-width: none;
+    padding: 0;
+  }
+  .kpi-card, .fact-card, .val-card, .summary-block, .checklist-item,
+  details.how-we-got-this, .sources-list a {
+    border: 1px solid #999 !important;
+    background: #fff !important;
+  }
+  a { color: #111 !important; text-decoration: underline; }
+
+  /* Trend chips, checklist scores and the verdict band currently lean on
+     color alone (good/watch/flag) to carry meaning — add the word back in
+     for grayscale printing, so meaning survives without color. */
+  .trend-chip, .checklist-score {
+    border: 1px solid #999 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .trend-good::after,
+  .score-2::after { content: " (good)"; }
+  .trend-watch::after,
+  .score-1::after { content: " (watch)"; }
+  .trend-flag::after,
+  .score-0::after { content: " (flag)"; }
+
+  .verdict-band {
+    color: #111 !important;
+  }
+
+  .mos-fill {
+    background: #666 !important;
+  }
+
+  /* Expand disclosure widgets so nothing collapsible is lost on paper —
+     .how-we-got-this defaults to closed; force its content to render even
+     without the [open] attribute. */
+  details.how-we-got-this > *:not(summary) {
+    display: block !important;
+  }
+}

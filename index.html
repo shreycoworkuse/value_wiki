@@ -7,6 +7,11 @@
 <meta name="description" content="Free, no-login dashboard for learning value investing. Type a US ticker and get a 20-year investigative dossier built live from public SEC filings — no signup, no database, nothing stored on any server." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>" />
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/reading-mode.css" />
+<link rel="stylesheet" href="css/trust.css" />
+<link rel="stylesheet" href="css/tour.css" />
+<link rel="stylesheet" href="css/timeline.css" />
+<link rel="stylesheet" href="css/print.css" />
 </head>
 <body>
 
@@ -66,6 +71,7 @@
             <input id="price-input" type="number" min="0" step="0.01" placeholder="e.g. 150.00" />
           </label>
           <button id="export-csv" class="ghost-btn">Export KPI table (CSV)</button>
+          <button id="export-pdf" class="ghost-btn">Export full dossier (PDF)</button>
         </div>
       </div>
 
@@ -81,9 +87,14 @@
 
 <footer class="site-footer">
   <p>Value Wiki is an educational research tool, not personalized financial advice. Figures are sourced live from SEC EDGAR filings; verify anything important against the primary filing before relying on it. No accounts, no tracking, no server-side data storage.</p>
+  <p id="footer-trust"></p>
 </footer>
 
 <script src="vendor/chart.umd.min.js"></script>
 <script type="module" src="js/main.js"></script>
+<script type="module">
+  import { reportErrorLink } from "./js/trust.js";
+  document.getElementById("footer-trust").innerHTML = reportErrorLink({ compact: true });
+</script>
 </body>
 </html>

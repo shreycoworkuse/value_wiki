@@ -1,0 +1,49 @@
+/* Trust layer: confidence legend, inline estimate marks, and
+   report-error / corrections-log links. Pairs with js/trust.js. */
+
+.confidence-legend {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.confidence-legend strong { color: var(--text); }
+
+.confidence-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--watch);
+  background: var(--watch-soft);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 3px;
+  line-height: 1.4;
+  vertical-align: super;
+  cursor: help;
+}
+
+.trust-links-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.trust-links-block .trust-link {
+  display: block;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.trust-links-block .trust-link:hover { border-color: var(--accent); }
+
+.trust-links-inline { font-size: inherit; }
+.trust-links-inline a { color: var(--accent); }

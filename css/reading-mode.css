@@ -1,0 +1,75 @@
+/* Reading mode: Story mode vs Analyst mode for the KPI grid.
+   Analyst mode is the existing dense .kpi-grid layout defined in style.css —
+   nothing here overrides it. Story mode is opt-in via a .story-mode class
+   toggled on .kpi-grid by js/ui.js (renderKpiGrid), and is a pure additive
+   layer kept out of the shared stylesheet on purpose. */
+
+.reading-mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.reading-mode-toggle .mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.reading-mode-toggle .mode-btn:hover {
+  color: var(--accent);
+}
+
+.reading-mode-toggle .mode-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Story mode: one KPI at a time, single column, larger type, more air */
+.kpi-grid.story-mode {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.kpi-grid.story-mode .kpi-card {
+  margin-bottom: 40px;
+  padding: 32px;
+}
+
+.kpi-grid.story-mode .kpi-card:last-child {
+  margin-bottom: 0;
+}
+
+.kpi-grid.story-mode .kpi-card h3 {
+  font-size: 1.3rem;
+}
+
+.kpi-grid.story-mode .kpi-headline {
+  font-size: 1.05rem;
+  margin: 10px 0 20px;
+  line-height: 1.55;
+}
+
+.kpi-grid.story-mode .kpi-chart-wrap {
+  height: 240px;
+}
+
+.kpi-grid.story-mode .trend-chip {
+  font-size: 0.8rem;
+  padding: 4px 14px;
+}
+
+.kpi-grid.story-mode .how-we-got-this {
+  margin-top: 20px;
+  padding: 16px 20px;
+}
