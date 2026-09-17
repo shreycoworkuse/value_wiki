@@ -1,13 +1,15 @@
 # Value Wiki
 
 A search-engine-style dashboard for learning value investing. Type a US
-ticker and get a live "dossier": up to ~15-20 years of KPI charts, cash-flow
-history, an automated red-flag scan, a Buffett/Li Lu-style owner's checklist
-verdict, and a rough intrinsic-value estimate — built on the fly, in your
-browser, straight from the company's own SEC filings.
+ticker (or one of a curated list of major London Stock Exchange names) and
+get a live "dossier": up to ~15-20 years of KPI charts, cash-flow history, an
+automated red-flag scan, a Buffett/Li Lu-style owner's checklist verdict, and
+a rough intrinsic-value estimate — built on the fly, in your browser,
+straight from the company's own regulatory filings.
 
 **Try it:** open `index.html` (or run the local server below) and search
-`AAPL`, `KO`, `MSFT`, `JNJ` or `WMT`, or any other US-listed ticker.
+`AAPL`, `KO`, `MSFT`, `JNJ` or `WMT`, or `VOD` for a London Stock Exchange
+example.
 
 ## Why it's free, with no login, and no database
 
@@ -19,13 +21,16 @@ browser, straight from the company's own SEC filings.
   remembered across visits. Close the tab and there's nothing left behind
   except an optional light/dark theme preference in your own browser's
   `localStorage`.
-- **All data is fetched live, on the fly, straight from the source.** Every
-  number comes from the U.S. SEC's free, public, no-API-key EDGAR endpoints —
-  the company ticker list (`www.sec.gov/files/company_tickers.json`) and each
-  company's structured XBRL filings (`data.sec.gov/api/xbrl/companyfacts/...`).
-  There's no multi-GB database anywhere: your browser asks the SEC for one
-  company's numbers, computes everything client-side, and throws it away when
-  you navigate away.
+- **All data is fetched live, on the fly, straight from the source.** For US
+  companies, every number comes from the SEC's free, public, no-API-key
+  EDGAR endpoints — the company ticker list
+  (`www.sec.gov/files/company_tickers.json`) and each company's structured
+  XBRL filings (`data.sec.gov/api/xbrl/companyfacts/...`). For a curated list
+  of LSE names, numbers are parsed live from Inline XBRL (iXBRL) inside
+  annual report documents filed with UK Companies House — see
+  "UK / LSE support" below. There's no multi-GB database anywhere: your
+  browser asks the filing regulator for one company's numbers, computes
+  everything client-side, and throws it away when you navigate away.
 - **No paid market-data feed.** Instead of a licensed real-time price API,
   the valuation tab lets you optionally type in a price you see anywhere, and
   recomputes P/E, P/B and a margin-of-safety gauge instantly from that.
@@ -179,12 +184,67 @@ Even if this ever breaks, the app still works wherever `data.sec.gov`'s
 direct fetch isn't blocked — the proxy is a fallback, not a requirement to
 run.
 
+## UK / LSE support
+
+A curated list of ~40 major London Stock Exchange names (`UK_TICKERS` in
+`js/uk-companies.js`) is searchable alongside US tickers — e.g. `VOD`
+(Vodafone), `ULVR` (Unilever), `HSBA` (HSBC). Search and the resolver
+(`resolveCompanyState()` in `js/main.js`) try SEC first, then fall back to
+this UK list, so US and UK companies share one search box.
+
+**Why this is a curated list, not open ticker search:** the UK has no free
+equivalent of SEC's ticker-to-CIK JSON file. Resolving an LSE ticker to a UK
+Companies House company number requires a Companies House company-search
+API call per lookup, so — to keep this free and without hardcoding real
+company data at build time — only tickers a person actually deploying this
+app has chosen to list are searchable. Adding a company means adding one
+line to `UK_TICKERS`, not touching a database.
+
+**Why the numbers come from a hand-written iXBRL parser, not a clean JSON
+API:** unlike SEC's XBRL, UK Companies House does not expose structured
+financial figures as JSON. Its API (`api.company-information.service.gov.uk`)
+only returns filing *metadata* (dates, categories, document links); the
+actual numbers live inside the filed annual report itself, as Inline XBRL
+(iXBRL) — financial facts tagged in-place inside an XHTML document using the
+`ifrs-full:`/`uk-gaap:` taxonomies. `js/ixbrl.js` is a from-scratch parser
+for that format: it walks `<ix:nonFraction>`/`<ix:nonNumeric>` tags, resolves
+each fact's `<xbrli:context>` to a period, applies `scale` and `sign`, and
+picks the non-dimensional (consolidated, whole-company) figure for each
+concept and period.
+
+**Honest limitation — this has not been tested against a real, live
+Companies House filing.** The sandbox this app was built in cannot reach
+`api.company-information.service.gov.uk` or the Companies House document
+API, so the iXBRL parser and the UK resolution pipeline were validated
+end-to-end against a hand-built, spec-compliant *synthetic* iXBRL fixture
+(`test_ixbrl.js`, `test_uk_pipeline.js` in the dev scratchpad — not part of
+the deployed site), not a real filing. Real annual reports vary in how they
+lay out dimensional data, rounding, and negative-value conventions far more
+than a single synthetic fixture can cover, so treat any UK company's numbers
+as unverified until you've checked them against the linked Companies House
+filing yourself (the Sources tab links directly to it). If a UK filing
+doesn't parse cleanly, that's a real, expected possibility — please open an
+issue with the company and filing so the parser can be improved against it.
+
+**Setup required for UK support to work live:** register a free API key at
+https://developer.company-information.service.gov.uk (Companies House's own
+free, no-cost developer program — no credit card, no paid tier) and add it
+as a repository-level GitHub Actions secret named `COMPANIES_HOUSE_API_KEY`,
+the same way as the Cloudflare secrets above. The Worker forwards it as HTTP
+Basic Auth to Companies House (`chAuthHeader()` in `sec-proxy.js`). Without
+this secret set, UK lookups fail gracefully with a clear "Companies House
+API key not configured" message rather than a silent or confusing error —
+the rest of the site (all US/SEC functionality) is unaffected either way.
+
 ## How the data flows
 
 1. `js/sec.js` reads the same-origin `data/company_tickers.json` (refreshed
    from SEC on every deploy — see above) for ticker search, and fetches a
    company's full XBRL "company facts" JSON live from `data.sec.gov` (or,
-   as a fallback, the Cloudflare Worker proxy) on each search.
+   as a fallback, the Cloudflare Worker proxy) on each search. For a UK
+   ticker, `js/uk-companies.js` and `js/ixbrl.js` do the equivalent job
+   through the same Worker (`service=ch` routing) against Companies House
+   and its filed iXBRL documents — see "UK / LSE support" above.
 2. `js/kpis.js` collapses the raw, sometimes-duplicated XBRL facts into one
    clean annual figure per fiscal year (preferring the most recently filed,
    audited value for each period), and derives ratios like margins, ROE and

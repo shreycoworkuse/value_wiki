@@ -20,7 +20,7 @@
 const TICKERS_URL = "data/company_tickers.json";
 const FACTS_URL = (cik10) => `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik10}.json`;
 
-const PROXY_URL = "https://value-wiki-sec-proxy.shrey-cowork-use.workers.dev";
+export const PROXY_URL = "https://value-wiki-sec-proxy.shrey-cowork-use.workers.dev";
 
 async function fetchFactsJson(target, onProgress) {
   try {

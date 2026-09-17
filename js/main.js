@@ -1,4 +1,5 @@
-import { searchTickers, findTickerExact, fetchCompanyFacts, filingIndexUrl } from "./sec.js";
+import { searchTickers, findTickerExact, fetchCompanyFacts, filingIndexUrl, PROXY_URL } from "./sec.js";
+import { UK_TICKERS, findUkTicker, fetchUkCompanySeries } from "./uk-companies.js";
 import { buildAnnualSeries, computeDerived } from "./kpis.js";
 import { detectRedFlags } from "./redflags.js";
 import { buildChecklist } from "./verdict.js";
@@ -11,26 +12,52 @@ import { renderValuationExtra } from "./valuation-extra.js";
 import { renderCompare } from "./compare.js";
 import { initTour } from "./tour.js";
 
+// Resolves one ticker into a fully-computed { company, base, derived,
+// checklist } state, trying the US/SEC pipeline first (the larger, more
+// battle-tested one) and only trying the curated UK/LSE pipeline if SEC has
+// no match for that exact ticker — so a ticker that happens to exist in
+// both never gets silently routed away from the bigger, better-covered
+// dataset. Shared by both the main dossier loader and the Compare tab.
+async function resolveCompanyState(tickerQuery, onProgress) {
+  const secMatch = await findTickerExact(tickerQuery);
+  if (secMatch) {
+    onProgress?.(`Requesting SEC XBRL company facts for CIK ${secMatch.cik}…`);
+    const facts = await fetchCompanyFacts(secMatch.cik, onProgress);
+    const base = buildAnnualSeries(facts);
+    if (!base.years.length) {
+      throw new Error(`SEC has a record for ${secMatch.name}, but no usable annual (10-K) XBRL figures were found.`);
+    }
+    onProgress?.(`Found ${base.years.length} years of annual filings (FY${base.years[0]}–FY${base.years[base.years.length - 1]})`);
+    const derived = computeDerived(base);
+    const checklist = buildChecklist(base, derived);
+    return {
+      company: { name: secMatch.name, ticker: secMatch.ticker, cik: secMatch.cik, market: "US" },
+      base,
+      derived,
+      checklist,
+    };
+  }
+
+  const ukMatch = findUkTicker(tickerQuery);
+  if (ukMatch) {
+    const result = await fetchUkCompanySeries(tickerQuery, PROXY_URL, onProgress);
+    if (!result) throw new Error(`Couldn't find a ticker matching "${tickerQuery}".`);
+    const derived = computeDerived(result.base);
+    const checklist = buildChecklist(result.base, derived);
+    return { company: result.company, base: result.base, derived, checklist };
+  }
+
+  return null;
+}
+
 // Reused by the Compare tab to fetch and compute a second company's full
 // dossier state via the exact same live pipeline as the main dossier.
 async function fetchCompanyState(tickerQuery) {
-  const match = await findTickerExact(tickerQuery);
-  if (!match) {
-    throw new Error(`Couldn't find a US-listed ticker matching "${tickerQuery}".`);
+  const result = await resolveCompanyState(tickerQuery);
+  if (!result) {
+    throw new Error(`Couldn't find a ticker matching "${tickerQuery}" on SEC EDGAR or in our curated LSE list.`);
   }
-  const facts = await fetchCompanyFacts(match.cik);
-  const base = buildAnnualSeries(facts);
-  if (!base.years.length) {
-    throw new Error(`SEC has a record for ${match.name}, but no usable annual (10-K) XBRL figures were found.`);
-  }
-  const derived = computeDerived(base);
-  const checklist = buildChecklist(base, derived);
-  return {
-    company: { name: match.name, ticker: match.ticker, cik: match.cik },
-    base,
-    derived,
-    checklist,
-  };
+  return result;
 }
 
 const TABS = [
@@ -94,38 +121,28 @@ function showDossierShell() {
 
 async function loadDossier(tickerQuery) {
   showDossierShell();
-  setStatus(`<div class="spinner"></div><div>Looking up ${tickerQuery.toUpperCase()} in SEC EDGAR's ticker index…</div>`);
+  setStatus(`<div class="spinner"></div><div>Looking up ${tickerQuery.toUpperCase()}…</div>`);
 
   try {
-    const match = await findTickerExact(tickerQuery);
-    if (!match) {
-      setStatus(`Couldn't find a US-listed ticker matching "${tickerQuery}". This tool only covers companies that file with the U.S. SEC.`, true);
-      return;
-    }
-
     const progressLines = [];
     const onProgress = (msg) => {
       progressLines.push(msg);
       setStatus(`<div class="spinner"></div><div>${msg}</div><div class="progress-log">${progressLines.map((l) => `<div>✓ ${l}</div>`).join("")}</div>`);
     };
 
-    const facts = await fetchCompanyFacts(match.cik, onProgress);
-    onProgress("Computing KPIs, red flags and the owner's checklist, locally in your browser…");
-
-    const base = buildAnnualSeries(facts);
-    if (!base.years.length) {
-      setStatus(`SEC has a record for ${match.name}, but no usable annual (10-K) XBRL figures were found to build a dossier from.`, true);
+    const result = await resolveCompanyState(tickerQuery, onProgress);
+    if (!result) {
+      setStatus(`Couldn't find a ticker matching "${tickerQuery}". This tool covers any US company that files with the SEC, plus a curated list of major LSE-listed companies (not every LSE ticker).`, true);
       return;
     }
-    onProgress(`Found ${base.years.length} years of annual filings (FY${base.years[0]}–FY${base.years[base.years.length - 1]})`);
-    if (base.series.dividendsPaid.every((v) => v === null)) {
+    const { company, base, derived, checklist } = result;
+    onProgress("Computing KPIs, red flags and the owner's checklist, locally in your browser…");
+    if (company.market !== "LSE" && base.series.dividendsPaid.every((v) => v === null)) {
       onProgress("No dividend data found — this company may not pay a dividend.");
     }
-    const derived = computeDerived(base);
     const redFlags = detectRedFlags(base, derived);
-    const checklist = buildChecklist(base, derived);
 
-    state.company = { name: match.name, ticker: match.ticker, cik: match.cik };
+    state.company = company;
     state.base = base;
     state.derived = derived;
     state.redFlags = redFlags;
@@ -133,10 +150,12 @@ async function loadDossier(tickerQuery) {
     state.price = null;
     el.priceInput.value = "";
 
-    el.name.textContent = `${match.name} (${match.ticker})`;
-    el.meta.innerHTML = `<span>CIK ${match.cik}</span><span>FY${base.years[0]}–FY${base.years[base.years.length - 1]}</span><span><a href="${filingIndexUrl(match.cik)}" target="_blank" rel="noopener">View filings on SEC EDGAR ↗</a></span>`;
+    el.name.textContent = `${company.name} (${company.ticker})`;
+    el.meta.innerHTML = company.market === "LSE"
+      ? `<span>Companies House #${company.companyNumber}</span><span>FY${base.years[0]}–FY${base.years[base.years.length - 1]}</span><span><a href="https://find-and-update.company-information.service.gov.uk/company/${company.companyNumber}" target="_blank" rel="noopener">View on Companies House ↗</a></span>`
+      : `<span>CIK ${company.cik}</span><span>FY${base.years[0]}–FY${base.years[base.years.length - 1]}</span><span><a href="${filingIndexUrl(company.cik)}" target="_blank" rel="noopener">View filings on SEC EDGAR ↗</a></span>`;
 
-    setUrlTicker(match.ticker);
+    setUrlTicker(company.ticker);
     el.status.classList.add("hidden");
     el.content.classList.remove("hidden");
     buildTabs();
@@ -145,9 +164,9 @@ async function loadDossier(tickerQuery) {
     console.error(err);
     const isNetworky = err instanceof TypeError;
     const hint = isNetworky
-      ? "This usually means the request never reached SEC at all — a browser extension (ad/tracker blocker), offline network, or a temporary SEC outage. Check your browser's console/network tab for the blocked request, then try again."
-      : "This can happen if SEC's public API is rate-limiting or temporarily unreachable — try again in a moment.";
-    setStatus(`Something went wrong fetching live data from SEC EDGAR: ${err.message || err}. ${hint}`, true);
+      ? "This usually means the request never reached the source at all — a browser extension (ad/tracker blocker), offline network, or a temporary outage. Check your browser's console/network tab for the blocked request, then try again."
+      : "This can happen if the data source is rate-limiting or temporarily unreachable — try again in a moment.";
+    setStatus(`Something went wrong fetching live data: ${err.message || err}. ${hint}`, true);
   }
 }
 
@@ -228,13 +247,25 @@ el.searchInput.addEventListener("input", () => {
   }
   searchDebounce = setTimeout(async () => {
     try {
-      const results = await searchTickers(q);
-      renderSearchResults(results);
+      const [secResults, ukResults] = await Promise.all([
+        searchTickers(q),
+        Promise.resolve(searchUkTickers(q)),
+      ]);
+      renderSearchResults([...secResults, ...ukResults]);
     } catch (e) {
       console.error(e);
     }
   }, 180);
 });
+
+function searchUkTickers(query, limit = 4) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return UK_TICKERS
+    .filter((t) => t.ticker.toLowerCase().startsWith(q) || t.name.toLowerCase().includes(q))
+    .slice(0, limit)
+    .map((t) => ({ ticker: t.ticker, name: t.name, market: "LSE" }));
+}
 
 function renderSearchResults(results) {
   if (!results.length) {
@@ -242,7 +273,7 @@ function renderSearchResults(results) {
     return;
   }
   el.searchResults.innerHTML = results
-    .map((r) => `<div class="result-item" data-ticker="${r.ticker}"><span class="result-ticker">${r.ticker}</span><span class="result-name">${r.name}</span></div>`)
+    .map((r) => `<div class="result-item" data-ticker="${r.ticker}"><span class="result-ticker">${r.ticker}${r.market === "LSE" ? ` <span class="result-market">LSE</span>` : ""}</span><span class="result-name">${r.name}</span></div>`)
     .join("");
   el.searchResults.classList.remove("hidden");
 }

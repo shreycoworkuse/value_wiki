@@ -90,7 +90,7 @@ const KPI_CFA_DETAIL = {
   netDebt: { formula: "net debt = long-term debt − cash and equivalents", note: "Excludes short-term/current debt, since that tag isn't collected by this tool; can understate total leverage for companies with heavy short-term borrowing." },
   cashConversion: { formula: "cash conversion = operating cash flow ÷ net income", note: "Left blank in loss years, since the ratio stops being meaningful when net income is zero or negative." },
 };
-const DEFAULT_CFA_NOTE = "Computed on the fly from the raw SEC XBRL figures for this company using a fixed, published formula — the same calculation is applied to every company, with no per-ticker adjustments.";
+const DEFAULT_CFA_NOTE = "Computed on the fly from this company's raw filed XBRL figures using a fixed, published formula — the same calculation is applied to every company, with no per-ticker adjustments.";
 
 export function renderCoverStory(container, { company, base, derived, redFlags, checklist }) {
   const years = base.years;
@@ -110,9 +110,9 @@ export function renderCoverStory(container, { company, base, derived, redFlags, 
         <div class="fact-card"><div class="fact-label">Owner's checklist</div><div class="fact-value">${checklist.total}/${checklist.max}</div><div class="fact-sub">${checklist.band}</div></div>
       </div>
       <div class="summary-block">
-        <p><strong>${company.name}</strong> (${company.ticker}) has filed ${years.length} annual report${years.length === 1 ? "" : "s"} with the SEC, covering ${span}. Over that span, ${term("revenue", "revenue")} moved from ${formatMoneyShort(base.series.revenue[0])} to ${formatMoneyShort(lastRevenue?.value ?? null)}${revCagr !== null ? `, a compound rate of about ${formatPercent(revCagr)} a year` : ""}.</p>
+        <p><strong>${company.name}</strong> (${company.ticker}) has filed ${years.length} annual report${years.length === 1 ? "" : "s"} with ${company.market === "LSE" ? "UK Companies House" : "the SEC"}, covering ${span}. Over that span, ${term("revenue", "revenue")} moved from ${formatMoneyShort(base.series.revenue[0])} to ${formatMoneyShort(lastRevenue?.value ?? null)}${revCagr !== null ? `, a compound rate of about ${formatPercent(revCagr)} a year` : ""}.</p>
         ${redFlags.length ? `<p><strong>${redFlags.length} thing${redFlags.length === 1 ? "" : "s"} worth watching</strong> turned up in the filed numbers — see the KPI chapters and red-flag notes below for specifics.</p>` : `<p>No rule-based red flags triggered on the checks this tool runs — that doesn't mean the business is risk-free, only that these specific automated checks didn't fire.</p>`}
-        <p class="data-gap-note">This summary is generated mechanically from SEC XBRL figures — it is a starting point for research, not a research report.</p>
+        <p class="data-gap-note">This summary is generated mechanically from filed XBRL figures — it is a starting point for research, not a research report.</p>
       </div>
     </div>
   `));
@@ -237,7 +237,7 @@ export function renderFollowTheMoney(container, { base, derived }) {
     <tbody>${rows.map(([label, arr]) => `<tr><td>${label}</td>${arr.map((v) => `<td>${formatMoney(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 
-export function renderVerdict(container, { checklist, redFlags }) {
+export function renderVerdict(container, { company, checklist, redFlags }) {
   container.innerHTML = "";
   const pct = checklist.total / checklist.max;
   const cls = pct >= 0.7 ? "good" : pct >= 0.4 ? "watch" : "flag";
@@ -265,7 +265,7 @@ export function renderVerdict(container, { checklist, redFlags }) {
         </div>
       ` : `<p class="no-flags" style="margin-top:20px;">No automated red-flag checks fired on this filing history.</p>`}
       <div class="disclaimer-box">
-        This checklist and score are mechanically generated from public SEC filings using fixed, published rules — there is no analyst judgment, no AI opinion, and no price target behind it. It is <strong>not</strong> a recommendation to buy, hold or sell anything. Nothing here is personalized financial advice; verify anything important against the original filings linked in the Sources tab.
+        This checklist and score are mechanically generated from ${company?.market === "LSE" ? "public Companies House filings" : "public SEC filings"} using fixed, published rules — there is no analyst judgment, no AI opinion, and no price target behind it. It is <strong>not</strong> a recommendation to buy, hold or sell anything. Nothing here is personalized financial advice; verify anything important against the original filings linked in the Sources tab.
       </div>
     </div>
   `));
@@ -313,15 +313,25 @@ export function renderValuation(container, { base, derived, price }) {
 
 export function renderSources(container, { company }) {
   container.innerHTML = "";
+  const isUk = company.market === "LSE";
   container.append(el(`
     <div>
       ${confidenceLegend()}
-      <p>Every figure in this dossier was read directly from ${company.name}'s own filings with the U.S. Securities and Exchange Commission, fetched live from SEC EDGAR's free public API — nothing here is estimated, scraped from a paid data vendor, or cached on a server.</p>
-      <div class="sources-list">
-        <a href="${filingIndexUrl(company.cik)}" target="_blank" rel="noopener">→ Browse all 10-K annual filings for ${company.ticker} on SEC EDGAR</a>
-        <a href="https://data.sec.gov/api/xbrl/companyfacts/CIK${company.cik}.json" target="_blank" rel="noopener">→ Raw XBRL company-facts JSON this dossier was built from</a>
-        <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${parseInt(company.cik, 10)}&type=10-K" target="_blank" rel="noopener">→ SEC EDGAR company filing browser</a>
-      </div>
+      ${isUk ? `
+        <p>Every figure in this dossier was read directly from ${company.name}'s own annual accounts filed with UK Companies House, fetched live from its free public API and parsed from the filed Inline XBRL (iXBRL) document — nothing here is estimated, scraped from a paid data vendor, or cached on a server.</p>
+        <p class="data-gap-note">UK support is newer and narrower than the US pipeline: it covers a hand-curated list of major LSE-listed companies (not every LSE ticker), and — unlike SEC's clean structured API — parses the actual filed accounts document. If a figure here looks off, please check it against the primary filing below and use "Report an error" if something's wrong.</p>
+        <div class="sources-list">
+          <a href="https://find-and-update.company-information.service.gov.uk/company/${company.companyNumber}/filing-history?category=accounts" target="_blank" rel="noopener">→ Browse all filed annual accounts for ${company.name} on Companies House</a>
+          <a href="https://find-and-update.company-information.service.gov.uk/company/${company.companyNumber}" target="_blank" rel="noopener">→ Companies House company overview (number ${company.companyNumber})</a>
+        </div>
+      ` : `
+        <p>Every figure in this dossier was read directly from ${company.name}'s own filings with the U.S. Securities and Exchange Commission, fetched live from SEC EDGAR's free public API — nothing here is estimated, scraped from a paid data vendor, or cached on a server.</p>
+        <div class="sources-list">
+          <a href="${filingIndexUrl(company.cik)}" target="_blank" rel="noopener">→ Browse all 10-K annual filings for ${company.ticker} on SEC EDGAR</a>
+          <a href="https://data.sec.gov/api/xbrl/companyfacts/CIK${company.cik}.json" target="_blank" rel="noopener">→ Raw XBRL company-facts JSON this dossier was built from</a>
+          <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${parseInt(company.cik, 10)}&type=10-K" target="_blank" rel="noopener">→ SEC EDGAR company filing browser</a>
+        </div>
+      `}
       ${reportErrorLink()}
     </div>
   `));

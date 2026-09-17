@@ -19,7 +19,7 @@
   <div class="header-inner">
     <a class="brand" href="./">📖 Value&nbsp;Wiki</a>
     <form id="search-form" class="search-form" autocomplete="off">
-      <input id="search-input" type="text" placeholder="Search a US ticker or company… (e.g. AAPL, Coca-Cola)" aria-label="Search ticker or company" />
+      <input id="search-input" type="text" placeholder="Search a US or major LSE ticker… (e.g. AAPL, VOD)" aria-label="Search ticker or company" />
       <div id="search-results" class="search-results hidden" role="listbox"></div>
       <button type="submit">Open dossier</button>
     </form>
@@ -31,7 +31,7 @@
   <section id="view-landing" class="view">
     <div class="landing-hero">
       <h1>Read a company like an investigative journalist.<br>Understand it like a CFA.<br>In the language of a smart 15-year-old.</h1>
-      <p class="lede">Type any US-listed ticker. We pull up to 20 years of its own regulatory filings straight from the SEC — live, in your browser — and turn the numbers into a story: what grew, what broke, where the cash really went, and an owner's-checklist verdict. No login. No servers holding your data. Nothing to sign up for.</p>
+      <p class="lede">Type any US-listed ticker, or one of a curated list of major London Stock Exchange names. We pull up to 20 years of regulatory filings straight from the SEC (or UK Companies House) — live, in your browser — and turn the numbers into a story: what grew, what broke, where the cash really went, and an owner's-checklist verdict. No login. No servers holding your data. Nothing to sign up for.</p>
       <div class="example-chips">
         <span>Try:</span>
         <button class="chip" data-ticker="AAPL">AAPL</button>
@@ -39,6 +39,7 @@
         <button class="chip" data-ticker="MSFT">MSFT</button>
         <button class="chip" data-ticker="JNJ">JNJ</button>
         <button class="chip" data-ticker="WMT">WMT</button>
+        <button class="chip" data-ticker="VOD">VOD <span class="result-market">LSE</span></button>
       </div>
     </div>
     <div class="landing-notes">
@@ -52,7 +53,7 @@
       </div>
       <div class="note-card">
         <h3>How it stays free</h3>
-        <p>Every figure is fetched on the fly, in your browser, directly from the SEC's free public EDGAR API — the same filings source anyone can query with no key and no account. Nothing is cached on a server or database; close the tab and there's nothing left behind.</p>
+        <p>Every figure is fetched on the fly, in your browser, from free public filing sources — the SEC's EDGAR API for US companies, UK Companies House for a curated list of LSE names. Nothing is cached on a server or database; close the tab and there's nothing left behind.</p>
       </div>
     </div>
   </section>
@@ -86,7 +87,7 @@
 <div id="glossary-tooltip" class="glossary-tooltip hidden" role="tooltip"></div>
 
 <footer class="site-footer">
-  <p>Value Wiki is an educational research tool, not personalized financial advice. Figures are sourced live from SEC EDGAR filings; verify anything important against the primary filing before relying on it. No accounts, no tracking, no server-side data storage.</p>
+  <p>Value Wiki is an educational research tool, not personalized financial advice. Figures are sourced live from official regulatory filings (SEC EDGAR for US companies, UK Companies House for LSE names); verify anything important against the primary filing before relying on it. No accounts, no tracking, no server-side data storage.</p>
   <p id="footer-trust"></p>
 </footer>
 
