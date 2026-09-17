@@ -1,0 +1,3 @@
+# Fetched fresh on every deploy by scripts/fetch-tickers.sh (see that file
+# and js/sec.js) — not committed, so it can never go stale.
+/data/

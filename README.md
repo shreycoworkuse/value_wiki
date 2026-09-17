@@ -61,6 +61,7 @@ with historical publication dates, i.e. a database).
 No build step and no dependencies to install — it's plain HTML/CSS/JS.
 
 ```bash
+./scripts/fetch-tickers.sh   # one-time: fetches data/company_tickers.json
 python3 -m http.server 8080
 # then open http://localhost:8080
 ```
@@ -68,12 +69,29 @@ python3 -m http.server 8080
 Any other static file server works too (`npx serve`, VS Code's Live Server,
 etc.). Deploying it for free means pushing these files to GitHub Pages,
 Netlify, Vercel, Cloudflare Pages, or any static host — no server-side
-runtime or database required.
+runtime or database required. The GitHub Pages workflow in this repo
+(`.github/workflows/deploy-pages.yml`) runs the same fetch script on every
+deploy automatically.
+
+## Why there's a fetch script at all (a CORS note)
+
+`data.sec.gov`'s XBRL API (company facts — the actual financial figures) is
+built for exactly this kind of direct browser use and sends the right CORS
+headers. SEC's ticker→CIK→name list, though, is served from `www.sec.gov` — a
+plain content server, not the API domain — with no CORS header, so browsers
+block cross-origin JS from reading it. Since it's small (~1MB), public,
+rarely-changing reference data (not user data), the pragmatic fix is to fetch
+it server-side (where CORS doesn't apply) at deploy/dev time and serve it
+same-origin as a static file — see `scripts/fetch-tickers.sh`, the deploy
+workflow, and the comment at the top of `js/sec.js`. Every other figure in
+the app still comes from a genuine live, on-the-fly, client-side fetch.
 
 ## How the data flows
 
-1. `js/sec.js` fetches SEC's free ticker→CIK list once per page load, and a
-   company's full XBRL "company facts" JSON on each search.
+1. `js/sec.js` reads the same-origin `data/company_tickers.json` (refreshed
+   from SEC on every deploy — see above) for ticker search, and fetches a
+   company's full XBRL "company facts" JSON live from `data.sec.gov` on
+   each search.
 2. `js/kpis.js` collapses the raw, sometimes-duplicated XBRL facts into one
    clean annual figure per fiscal year (preferring the most recently filed,
    audited value for each period), and derives ratios like margins, ROE and
