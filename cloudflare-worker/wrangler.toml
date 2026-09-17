@@ -1,0 +1,6 @@
+name = "value-wiki-sec-proxy"
+main = "sec-proxy.js"
+compatibility_date = "2024-01-01"
+
+# Free tier: 100,000 requests/day, no billing required for this usage level.
+# No KV, no D1, no Durable Objects — the Worker is fully stateless.

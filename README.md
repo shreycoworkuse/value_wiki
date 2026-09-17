@@ -73,25 +73,64 @@ runtime or database required. The GitHub Pages workflow in this repo
 (`.github/workflows/deploy-pages.yml`) runs the same fetch script on every
 deploy automatically.
 
-## Why there's a fetch script at all (a CORS note)
+## Why the app fights CORS in two different ways
 
-`data.sec.gov`'s XBRL API (company facts — the actual financial figures) is
-built for exactly this kind of direct browser use and sends the right CORS
-headers. SEC's ticker→CIK→name list, though, is served from `www.sec.gov` — a
-plain content server, not the API domain — with no CORS header, so browsers
-block cross-origin JS from reading it. Since it's small (~1MB), public,
-rarely-changing reference data (not user data), the pragmatic fix is to fetch
-it server-side (where CORS doesn't apply) at deploy/dev time and serve it
-same-origin as a static file — see `scripts/fetch-tickers.sh`, the deploy
-workflow, and the comment at the top of `js/sec.js`. Every other figure in
-the app still comes from a genuine live, on-the-fly, client-side fetch.
+Neither of SEC's public JSON sources sends a CORS header for third-party
+origins, so a plain browser `fetch()` to either one gets blocked from
+anywhere other than sec.gov itself. The two are handled differently because
+they have different shapes:
+
+- **Ticker → CIK → name list** (`www.sec.gov/files/company_tickers.json`):
+  small (~1MB), public, rarely-changing reference data — not user data, and
+  the same for every visitor. Fetched once server-side (where CORS doesn't
+  apply) at deploy/dev time and published same-origin as a static file — see
+  `scripts/fetch-tickers.sh` and the deploy workflow. No proxy needed.
+
+- **Company facts** (`data.sec.gov/api/xbrl/companyfacts/...`): the actual
+  live financial data, fetched fresh per search for whatever ticker a
+  visitor types. It can't be pre-fetched the same way — bundling every
+  covered company's data at deploy time would mean exactly the kind of
+  multi-GB database this project is deliberately avoiding. Instead,
+  `fetchCompanyFacts()` tries the direct request first and, only if that's
+  blocked, falls back to a small Cloudflare Worker (`cloudflare-worker/`)
+  that we control: it forwards the same GET request and adds the missing
+  CORS header, nothing else — no logging, no storage, no account system, and
+  it only ever proxies SEC's company-facts endpoint (see the allow-list in
+  `sec-proxy.js`), so it can't be used as a general-purpose open proxy. A
+  public third-party CORS relay (corsproxy.io, allorigins.win, etc.) was
+  deliberately ruled out for this — it would see every ticker a visitor
+  looks up, and we can't vouch for a stranger's service.
+
+### Setting up the CORS proxy (one-time, free)
+
+The Worker deploys itself via `.github/workflows/deploy-worker.yml` on every
+push that touches `cloudflare-worker/`, but it needs two GitHub Actions
+secrets pointing at a free Cloudflare account:
+
+1. Create a free account at https://dash.cloudflare.com/sign-up (Workers'
+   free tier — 100,000 requests/day — doesn't require a paid plan).
+2. Get your **Account ID** from the right sidebar of the Cloudflare
+   dashboard.
+3. Create an **API token** at
+   https://dash.cloudflare.com/profile/api-tokens → "Create Token" → use the
+   "Edit Cloudflare Workers" template.
+4. In this repo, go to Settings → Secrets and variables → Actions, and add:
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `CLOUDFLARE_API_TOKEN`
+5. Push (or manually re-run the "Deploy SEC CORS proxy" workflow). Its logs
+   will print the Worker's URL (`https://value-wiki-sec-proxy.<your
+   subdomain>.workers.dev`) — paste that into `PROXY_URL` at the top of
+   `js/sec.js` and push again.
+
+Until that's done, the app still works wherever `data.sec.gov`'s direct
+fetch isn't blocked — the proxy is a fallback, not a requirement to run.
 
 ## How the data flows
 
 1. `js/sec.js` reads the same-origin `data/company_tickers.json` (refreshed
    from SEC on every deploy — see above) for ticker search, and fetches a
-   company's full XBRL "company facts" JSON live from `data.sec.gov` on
-   each search.
+   company's full XBRL "company facts" JSON live from `data.sec.gov` (or,
+   as a fallback, the Cloudflare Worker proxy) on each search.
 2. `js/kpis.js` collapses the raw, sometimes-duplicated XBRL facts into one
    clean annual figure per fiscal year (preferring the most recently filed,
    audited value for each period), and derives ratios like margins, ROE and
