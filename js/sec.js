@@ -1,17 +1,45 @@
 // Company-facts figures come live from SEC EDGAR's free, public, no-key XBRL
-// API — the browser talks to data.sec.gov directly, on the fly, per request.
-// Nothing is fetched through or stored on any server we control.
+// API, fetched fresh on every search — nothing is pre-fetched or stored on
+// any server we control.
 //
-// The ticker -> CIK lookup list is the one exception: SEC publishes it from
-// www.sec.gov (a plain content server, not the data.sec.gov API domain) with
-// no CORS header, so browsers refuse to read it cross-origin from any other
-// site. It's small (~1MB) and public reference data that changes rarely, so
-// the free deploy pipeline (see .github/workflows/deploy-pages.yml) fetches
-// a fresh copy server-side on every deploy and publishes it same-origin
-// alongside the site — no CORS problem, no database, still refreshed
-// automatically on every deploy rather than hand-maintained.
+// data.sec.gov doesn't send a CORS header for third-party origins, so a
+// direct browser fetch from anywhere but sec.gov itself is blocked. Unlike
+// the ticker list below, this data is per-company and fetched live for
+// whatever ticker a visitor types, so it can't be pre-fetched and bundled at
+// deploy time the same way — that would mean building exactly the kind of
+// multi-GB database this project is deliberately avoiding.
+//
+// Instead, fetchCompanyFacts() tries the direct request first and, only if
+// that's blocked, falls back to a small Cloudflare Worker we control
+// (cloudflare-worker/sec-proxy.js) that does nothing but forward the same
+// GET request and add the missing CORS header — still no database, still
+// stateless, still a live fetch per request, just relayed through
+// infrastructure we own instead of a third party. See that file and the
+// README for the setup this needs (a free Cloudflare account) and why a
+// public third-party CORS relay was deliberately ruled out instead.
 const TICKERS_URL = "data/company_tickers.json";
 const FACTS_URL = (cik10) => `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik10}.json`;
+
+// Filled in after the Worker's first deploy (its URL depends on your
+// Cloudflare account's workers.dev subdomain, so it can't be known ahead of
+// time) — see README "Setting up the CORS proxy". Left blank, the app still
+// works everywhere data.sec.gov's direct fetch isn't blocked.
+const PROXY_URL = "";
+
+async function fetchFactsJson(target, onProgress) {
+  try {
+    const res = await fetch(target, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { httpStatus: res.status });
+    return await res.json();
+  } catch (err) {
+    if (err.httpStatus) throw err; // SEC itself answered — that's authoritative, don't fall back
+    if (!PROXY_URL) throw err;
+    onProgress?.("Direct request was blocked — retrying through the CORS proxy…");
+    const res = await fetch(`${PROXY_URL}?url=${encodeURIComponent(target)}`, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { httpStatus: res.status });
+    return res.json();
+  }
+}
 
 let tickerIndexPromise = null;
 
@@ -70,16 +98,19 @@ export async function findTickerExact(query) {
 // in a filing, with the source form, fiscal year and filing date attached.
 export async function fetchCompanyFacts(cik10, onProgress) {
   onProgress?.(`Requesting SEC XBRL company facts for CIK ${cik10}…`);
-  const res = await fetch(FACTS_URL(cik10), { headers: { Accept: "application/json" } });
-  if (!res.ok) {
-    throw new Error(
-      res.status === 404
-        ? "This company has no structured XBRL filings on file with the SEC (common for very small or recently-listed companies)."
-        : `SEC company-facts request failed (HTTP ${res.status}).`
-    );
+  try {
+    const json = await fetchFactsJson(FACTS_URL(cik10), onProgress);
+    onProgress?.("Parsing filed figures…");
+    return json;
+  } catch (err) {
+    if (err.httpStatus === 404) {
+      throw new Error("This company has no structured XBRL filings on file with the SEC (common for very small or recently-listed companies).");
+    }
+    if (err.httpStatus) {
+      throw new Error(`SEC company-facts request failed (HTTP ${err.httpStatus}).`);
+    }
+    throw err;
   }
-  onProgress?.("Parsing filed figures…");
-  return res.json();
 }
 
 export function filingIndexUrl(cik10) {
