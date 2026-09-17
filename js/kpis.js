@@ -16,6 +16,11 @@ const RAW_TAGS = {
   capex: { taxonomy: "us-gaap", tags: ["PaymentsToAcquirePropertyPlantAndEquipment"], kind: "flow" },
   dilutedEps: { taxonomy: "us-gaap", tags: ["EarningsPerShareDiluted"], kind: "flow" },
   dilutedShares: { taxonomy: "us-gaap", tags: ["WeightedAverageNumberOfDilutedSharesOutstanding"], kind: "flow" },
+  grossProfit: { taxonomy: "us-gaap", tags: ["GrossProfit"], kind: "flow" },
+  assetsCurrent: { taxonomy: "us-gaap", tags: ["AssetsCurrent"], kind: "instant" },
+  liabilitiesCurrent: { taxonomy: "us-gaap", tags: ["LiabilitiesCurrent"], kind: "instant" },
+  dividendsPaid: { taxonomy: "us-gaap", tags: ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"], kind: "flow" },
+  incomeTaxExpense: { taxonomy: "us-gaap", tags: ["IncomeTaxExpenseBenefit"], kind: "flow" },
 };
 
 function durationDays(entry) {
@@ -101,6 +106,42 @@ export function computeDerived({ years, series }) {
   const bookValuePerShare = years.map((_, i) => div(series.equity[i], series.dilutedShares[i]));
   const revenueGrowth = years.map((_, i) => (i === 0 ? null : div(series.revenue[i] - series.revenue[i - 1], series.revenue[i - 1])));
 
+  const grossMargin = years.map((_, i) => div(series.grossProfit[i], series.revenue[i]));
+  const currentRatio = years.map((_, i) => div(series.assetsCurrent[i], series.liabilitiesCurrent[i]));
+  const netDebt = years.map((_, i) => {
+    const debt = series.longTermDebt[i];
+    if (debt === null) return null;
+    return debt - (series.cash[i] ?? 0);
+  });
+  const assetTurnover = years.map((_, i) => div(series.revenue[i], series.assets[i]));
+  const dividendPayoutRatio = years.map((_, i) => {
+    const dividends = series.dividendsPaid[i];
+    const ni = series.netIncome[i];
+    if (dividends === null || ni === null || ni <= 0) return null;
+    return Math.abs(dividends) / ni;
+  });
+  // NOPAT and invested capital are both approximations widely used for a
+  // rough ROIC when a company doesn't break out segment-level capital —
+  // effective tax rate is backed out from reported tax expense vs. income,
+  // clamped to a sane range so a one-off tax credit/charge doesn't produce
+  // a nonsense ratio.
+  const roic = years.map((_, i) => {
+    const opInc = series.operatingIncome[i];
+    const ni = series.netIncome[i];
+    const tax = series.incomeTaxExpense[i];
+    const equity_ = series.equity[i];
+    const debt = series.longTermDebt[i];
+    const cash_ = series.cash[i];
+    if (opInc === null || ni === null || tax === null || equity_ === null) return null;
+    const pretax = ni + tax;
+    if (pretax === 0) return null;
+    let effectiveTaxRate = tax / pretax;
+    effectiveTaxRate = Math.max(0, Math.min(0.5, effectiveTaxRate));
+    const nopat = opInc * (1 - effectiveTaxRate);
+    const investedCapital = equity_ + (debt ?? 0) - (cash_ ?? 0);
+    return div(nopat, investedCapital);
+  });
+
   return {
     years,
     n,
@@ -113,6 +154,12 @@ export function computeDerived({ years, series }) {
     fcfMargin,
     bookValuePerShare,
     revenueGrowth,
+    grossMargin,
+    currentRatio,
+    netDebt,
+    assetTurnover,
+    dividendPayoutRatio,
+    roic,
   };
 }
 
