@@ -101,29 +101,31 @@ they have different shapes:
   deliberately ruled out for this — it would see every ticker a visitor
   looks up, and we can't vouch for a stranger's service.
 
-### Setting up the CORS proxy (one-time, free)
+### The CORS proxy is deployed
 
-The Worker deploys itself via `.github/workflows/deploy-worker.yml` on every
-push that touches `cloudflare-worker/`, but it needs two GitHub Actions
-secrets pointing at a free Cloudflare account:
+The Worker is live at `https://value-wiki-sec-proxy.shrey-cowork-use.workers.dev`
+and wired into `PROXY_URL` in `js/sec.js`. It redeploys itself via
+`.github/workflows/deploy-worker.yml` on every push that touches
+`cloudflare-worker/`, using two repo-level GitHub Actions secrets
+(`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`) already configured against
+a free Cloudflare account (Workers' free tier — 100,000 requests/day, no
+paid plan needed).
 
-1. Create a free account at https://dash.cloudflare.com/sign-up (Workers'
-   free tier — 100,000 requests/day — doesn't require a paid plan).
-2. Get your **Account ID** from the right sidebar of the Cloudflare
-   dashboard.
-3. Create an **API token** at
-   https://dash.cloudflare.com/profile/api-tokens → "Create Token" → use the
-   "Edit Cloudflare Workers" template.
-4. In this repo, go to Settings → Secrets and variables → Actions, and add:
-   - `CLOUDFLARE_ACCOUNT_ID`
-   - `CLOUDFLARE_API_TOKEN`
-5. Push (or manually re-run the "Deploy SEC CORS proxy" workflow). Its logs
-   will print the Worker's URL (`https://value-wiki-sec-proxy.<your
-   subdomain>.workers.dev`) — paste that into `PROXY_URL` at the top of
-   `js/sec.js` and push again.
+If you ever need to redo this setup (e.g. forking this repo into a fresh
+Cloudflare account): create the account, grab the Account ID from the
+dashboard sidebar, create an API token at
+https://dash.cloudflare.com/profile/api-tokens using the "Edit Cloudflare
+Workers" template, add both as **repository-level** secrets under Settings →
+Secrets and variables → Actions (not an "Environment" — the workflow doesn't
+target one, so environment-scoped secrets aren't visible to it), register a
+workers.dev subdomain the first time at
+https://dash.cloudflare.com/*/workers/onboarding if your account doesn't
+have one yet, then re-run the "Deploy SEC CORS proxy" workflow and copy the
+URL its logs print into `PROXY_URL`.
 
-Until that's done, the app still works wherever `data.sec.gov`'s direct
-fetch isn't blocked — the proxy is a fallback, not a requirement to run.
+Even if this ever breaks, the app still works wherever `data.sec.gov`'s
+direct fetch isn't blocked — the proxy is a fallback, not a requirement to
+run.
 
 ## How the data flows
 
