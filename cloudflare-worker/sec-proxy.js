@@ -1,8 +1,10 @@
-// A minimal, stateless CORS passthrough for two free public filing APIs
-// this app reads live: SEC EDGAR (US) and Companies House (UK). Same
-// reasoning for both — see the per-service sections below — and the same
-// non-goal: no caching layer of its own beyond what Cloudflare's edge does
-// for any HTTP response, no logging, no storage, no account system.
+// A minimal, stateless CORS passthrough for three free public data sources
+// this app reads live: SEC EDGAR (US filings), Companies House (UK
+// filings), and Stooq (historical daily close prices, for the Money flow
+// tab's price chart — free, no login, no API key, same as the other two).
+// Same non-goal for all three: no caching layer of its own beyond what
+// Cloudflare's edge does for any HTTP response, no logging, no storage, no
+// account system.
 //
 // Deployed by .github/workflows/deploy-worker.yml on every push to main.
 
@@ -128,6 +130,35 @@ async function handleCompaniesHouse(op, params, env) {
   });
 }
 
+// --- Stooq (historical daily close prices) ------------------------------
+// stooq.com/q/d/l/ is a free, keyless, no-login daily-OHLC CSV export — the
+// same source many small/hobby finance tools use, since there is no
+// official free stock-price API. It's an unofficial best-effort source
+// (occasional gaps, rate limits, or an outage are possible), so the app
+// treats a failure here the same way as any other "couldn't fetch" case —
+// degrade gracefully, never block the rest of the dossier.
+//
+// Scoped to a tightly-validated <ticker>.<market suffix> symbol the browser
+// sends (e.g. "aapl.us", "vod.uk") — never a raw upstream URL — so this
+// can't be turned into an open proxy for arbitrary stooq.com paths.
+const STOOQ_SYMBOL_RE = /^[a-z0-9.-]{1,15}\.(us|uk)$/i;
+
+async function handleStooq(params) {
+  const symbol = params.get("symbol");
+  if (!symbol || !STOOQ_SYMBOL_RE.test(symbol)) {
+    return badRequest("Missing or invalid 'symbol' parameter for the Stooq service (expected e.g. 'aapl.us' or 'vod.uk').");
+  }
+  const upstreamUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol.toLowerCase())}&i=d`;
+  const upstream = await fetch(upstreamUrl, { headers: { Accept: "text/csv" } });
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: withCors({
+      "Content-Type": "text/csv",
+      "Cache-Control": "public, max-age=3600",
+    }),
+  });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -148,6 +179,9 @@ export default {
     if (service === "ch") {
       return handleCompaniesHouse(params.get("op"), params, env);
     }
-    return badRequest("Unknown service. Expected service=sec|ch.");
+    if (service === "stooq") {
+      return handleStooq(params);
+    }
+    return badRequest("Unknown service. Expected service=sec|ch|stooq.");
   },
 };
