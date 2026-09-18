@@ -85,7 +85,7 @@ export function renderMoneyFlow(container, args) {
       <div class="mf-grid">
         <div class="mf-left">
           <h3>Where the capital sits</h3>
-          <p class="mf-hint">Select a bar to plot its history in the center. Bar length is proportional to the largest balance shown this period.</p>
+          <p class="mf-hint">Select a bar to plot it center. Length ∝ largest balance shown.</p>
           <div class="mf-bars"></div>
         </div>
         <div class="mf-center">
@@ -108,13 +108,26 @@ export function renderMoneyFlow(container, args) {
           <div class="mf-price">
             <div class="mf-price-head">
               <h3>Price vs. book value / share</h3>
-              <div class="mf-price-stats"></div>
+              <span class="mf-price-range"></span>
             </div>
-            <div class="mf-price-chart-wrap"><canvas class="mf-price-canvas"></canvas></div>
+            <div class="mf-price-legend"></div>
+            <div class="mf-price-chart-wrap">
+              <canvas class="mf-price-canvas"></canvas>
+              <div class="mf-price-marker"></div>
+            </div>
+            <div class="mf-price-foot">
+              <span class="mf-price-pb"></span>
+              <span class="mf-price-progress"></span>
+            </div>
+            <div class="mf-scrub-label">
+              <span>Timeline scrubber</span>
+              <span class="mf-scrub-badge"></span>
+            </div>
             <div class="mf-scrub-row">
-              <button type="button" class="mf-scrub-step" data-dir="-1" aria-label="Previous period">◀</button>
+              <button type="button" class="mf-scrub-step" data-dir="-1" aria-label="Previous period">◀ Prev</button>
               <input type="range" class="mf-scrub-slider" min="0" max="${unified.periods.length - 1}" value="${state.index}" />
-              <button type="button" class="mf-scrub-step" data-dir="1" aria-label="Next period">▶</button>
+              <button type="button" class="mf-scrub-step" data-dir="1" aria-label="Next period">Next ▶</button>
+              <button type="button" class="mf-scrub-today">Today</button>
             </div>
           </div>
         </div>
@@ -130,13 +143,21 @@ export function renderMoneyFlow(container, args) {
   const centerCanvas = shell.querySelector(".mf-center-canvas");
   const timelineScroll = shell.querySelector(".mf-timeline-scroll");
   const timelineRange = shell.querySelector(".mf-timeline-range");
-  const priceStats = shell.querySelector(".mf-price-stats");
+  const priceRange = shell.querySelector(".mf-price-range");
+  const priceLegend = shell.querySelector(".mf-price-legend");
+  const priceChartWrap = shell.querySelector(".mf-price-chart-wrap");
   const priceCanvas = shell.querySelector(".mf-price-canvas");
+  const priceMarker = shell.querySelector(".mf-price-marker");
+  const pricePb = shell.querySelector(".mf-price-pb");
+  const priceProgress = shell.querySelector(".mf-price-progress");
+  const scrubBadge = shell.querySelector(".mf-scrub-badge");
   const scrubSlider = shell.querySelector(".mf-scrub-slider");
 
-  timelineRange.textContent = unified.periods.length
+  const rangeLabel = unified.periods.length
     ? `${unified.periods[0].label} – ${unified.periods[unified.periods.length - 1].label}`
     : "";
+  timelineRange.textContent = rangeLabel;
+  priceRange.textContent = rangeLabel;
 
   // --- Left panel: balance-sheet bars, built once, updated in place -------
   function buildBarRow(key, label, isTotal) {
@@ -270,7 +291,13 @@ export function renderMoneyFlow(container, args) {
   function updateTimeline(i) {
     timelineRows.forEach((row, idx) => row.classList.toggle("current", idx === i));
     const current = timelineRows[i];
-    if (current) current.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (!current) return;
+    // Scrolls only this internal list, never the page — scrollIntoView()
+    // walks every scrollable ancestor (including the page itself), which
+    // is exactly the "page jumps around while scrubbing" bug this avoids.
+    const relativeTop = current.getBoundingClientRect().top - timelineScroll.getBoundingClientRect().top + timelineScroll.scrollTop;
+    const target = relativeTop - timelineScroll.clientHeight / 2 + current.clientHeight / 2;
+    timelineScroll.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }
 
   // --- Right-bottom: price vs. book value / share --------------------------
@@ -323,38 +350,51 @@ export function renderMoneyFlow(container, args) {
       fill: false,
     });
 
+    const chartOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y === null ? "—" : "$" + ctx.parsed.y.toFixed(2)}` } },
+      },
+      scales: {
+        x: { ticks: { color: text, maxRotation: 0, autoSkip: true, font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: text, font: { size: 9 }, callback: (v) => "$" + v }, grid: { color: border } },
+      },
+    };
+
     if (!priceChart) {
-      priceChart = new Chart(priceCanvas, {
-        type: "line",
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 300 },
-          plugins: {
-            legend: { display: true, position: "top", labels: { boxWidth: 10, usePointStyle: true, color: text, font: { size: 10 } } },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y === null ? "—" : "$" + ctx.parsed.y.toFixed(2)}` } },
-          },
-          scales: {
-            x: { ticks: { color: text, maxRotation: 0, autoSkip: true }, grid: { display: false } },
-            y: { ticks: { color: text, callback: (v) => "$" + v }, grid: { color: border } },
-          },
-        },
-      });
+      priceChart = new Chart(priceCanvas, { type: "line", data: { labels, datasets }, options: chartOpts });
     } else {
       priceChart.data.labels = labels;
       priceChart.data.datasets = datasets;
       priceChart.update();
     }
 
+    // Vertical "you are here" marker, positioned at the current index's
+    // real pixel X — Chart.js's free bundle has no annotation plugin, so
+    // this is a plain absolutely-positioned div read off the chart's own
+    // scale after each render/resize.
+    const xPixel = priceChart.scales?.x?.getPixelForValue(i);
+    if (Number.isFinite(xPixel)) {
+      priceMarker.style.left = `${xPixel}px`;
+      priceMarker.style.display = "block";
+    } else {
+      priceMarker.style.display = "none";
+    }
+
     const priceNow = prices ? lastNonNull(prices, i) : null;
     const bvpsNow = lastNonNull(bvpsSeries, i);
     const pb = priceNow && bvpsNow ? div(priceNow.value, bvpsNow.value) : null;
-    priceStats.innerHTML = `
-      ${priceNow ? `<span>Price <b>$${priceNow.value.toFixed(2)}</b></span>` : `<span class="mf-price-unavailable">Price data unavailable for this company</span>`}
-      ${bvpsNow ? `<span>Book val/share <b>$${bvpsNow.value.toFixed(2)}</b></span>` : ""}
-      ${pb !== null ? `<span>P/B <b>${formatRatio(pb)}</b></span>` : ""}
+
+    priceLegend.innerHTML = `
+      <span class="mf-legend-item"><span class="mf-legend-dot" style="background:${good}"></span>Stock: ${priceNow ? "$" + priceNow.value.toFixed(2) : "unavailable"}</span>
+      <span class="mf-legend-item"><span class="mf-legend-dot mf-legend-dash"></span>Book val: ${bvpsNow ? "$" + bvpsNow.value.toFixed(2) : "—"}</span>
     `;
+    pricePb.textContent = pb !== null ? `P/B ${formatRatio(pb)}` : "";
+    priceProgress.textContent = `Period ${i + 1} of ${unified.periods.length}`;
+    scrubBadge.textContent = `${unified.periods[i].label}${priceNow ? " · $" + priceNow.value.toFixed(2) : ""}`;
   }
 
   // --- Wiring ---------------------------------------------------------------
@@ -375,6 +415,17 @@ export function renderMoneyFlow(container, args) {
   shell.querySelectorAll(".mf-scrub-step").forEach((btn) => {
     btn.addEventListener("click", () => setIndex(state.index + Number(btn.dataset.dir)));
   });
+  shell.querySelector(".mf-scrub-today").addEventListener("click", () => setIndex(unified.periods.length - 1));
+
+  // The screen's own height is fixed by CSS (viewport-relative, so the tab
+  // never requires scrolling the page itself — only the bounded panels
+  // inside it scroll). This just keeps the "you are here" marker aligned
+  // to the price chart's actual pixel position after a resize.
+  function repositionMarker() {
+    const xPixel = priceChart?.scales?.x?.getPixelForValue(state.index);
+    if (Number.isFinite(xPixel)) priceMarker.style.left = `${xPixel}px`;
+  }
+  window.addEventListener("resize", repositionMarker);
 
   renderAll();
 
