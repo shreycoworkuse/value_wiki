@@ -1,126 +1,388 @@
-// Orchestrates the "Money flow" tab: a time-sliced view of the whole
-// business built from the financial graph (js/financial-graph.js), with
-// four sub-screens (Business Map, Business Health, Market vs Business, plus
-// a narrative event feed) sharing one time slider.
+// The "Money flow" tab: one unified, timeline-driven screen showing the
+// whole business over time — built entirely from data already fetched for
+// this dossier (financial-graph.js's balance-sheet nodes, plus a free
+// historical price series from Stooq for context). Nothing here is
+// editable or interactive beyond scrubbing time and picking what to plot;
+// every number traces back to a real filed figure.
 //
-// SCOPE: quarterly resolution is only available for US/SEC companies
-// (buildQuarterlySeries reads 10-Q filings, which UK Companies House
-// doesn't have an equivalent of) — UK companies fall back to annual
-// resolution here, clearly labeled, rather than silently only working for
-// one market.
+// Layout: left = balance-sheet "reservoir" bars (click one to plot it
+// center), center = that item's full history, right = a vertical
+// quarter-by-quarter timeline (with a real, rule-derived one-liner per
+// period) over a price-vs-book-value chart. One scrub position drives all
+// four panels.
 import { annualToPeriods, quarterlyToPeriods, buildGraphSeries, getNodeHistory } from "./financial-graph.js";
-import { renderBusinessMap } from "./money-flow-map.js";
-import { renderBusinessHealth } from "./business-health.js";
-import { renderMarketVsBusiness } from "./market-vs-business.js";
-import { detectNarrativeEvents, renderNarrative } from "./story-narrative.js";
+import { narrativeLineFor } from "./narrative-line.js";
+import { fetchStockPriceSeries } from "./stock-price.js";
+import { formatMoneyShort, formatPercent, formatRatio } from "./charts.js";
+import { PROXY_URL } from "./sec.js";
 
-const SCREENS = [
-  { id: "map", label: "Business map", render: renderBusinessMap },
-  { id: "health", label: "Business health", render: renderBusinessHealth },
-  { id: "market", label: "Market vs business", render: renderMarketVsBusiness },
-];
+const ASSET_CATEGORIES = new Set(["asset-stock"]);
+const LIABEQ_CATEGORIES = new Set(["liability-stock", "equity-stock"]);
+
+function el(html) {
+  const div = document.createElement("div");
+  div.innerHTML = html.trim();
+  return div.firstElementChild;
+}
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function div(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined || b === 0) return null;
+  return a / b;
+}
+
+function lastNonNull(arr, upTo) {
+  for (let i = Math.min(upTo, arr.length - 1); i >= 0; i--) {
+    if (arr[i] !== null && arr[i] !== undefined) return { value: arr[i], index: i };
+  }
+  return null;
+}
+
+// Collects the union of stock-layer nodes across every period, in a stable
+// left-to-right/top-to-bottom order — a company's balance-sheet composition
+// barely changes period to period, but this handles the rare cases (a new
+// goodwill balance after an acquisition, etc.) without the bar list
+// reshuffling or nodes popping in/out of existence.
+function collectStockNodeRegistry(graphSeries) {
+  const assets = new Map();
+  const liabEq = new Map();
+  for (const g of graphSeries) {
+    for (const n of g.nodes) {
+      if (ASSET_CATEGORIES.has(n.category) && !assets.has(n.id)) assets.set(n.id, n.label);
+      if (LIABEQ_CATEGORIES.has(n.category) && !liabEq.has(n.id)) liabEq.set(n.id, n.label);
+    }
+  }
+  return { assets, liabEq };
+}
 
 export function renderMoneyFlow(container, args) {
-  const { company, base, derived, price, quarterly } = args;
+  const { company, base, derived, quarterly } = args;
 
   const usingQuarterly = Boolean(quarterly && quarterly.periods && quarterly.periods.length);
   const unified = usingQuarterly ? quarterlyToPeriods(quarterly) : annualToPeriods(base);
   const graphSeries = buildGraphSeries(unified);
-  const events = detectNarrativeEvents(unified);
+  const registry = collectStockNodeRegistry(graphSeries);
 
   const state = {
     index: unified.periods.length - 1,
-    screen: "map",
+    selectedKey: "assets",
+    selectedLabel: "Total assets",
+    prices: null, // filled in async once Stooq responds
   };
 
   container.innerHTML = "";
-  const shell = document.createElement("div");
-  shell.className = "money-flow-shell";
-  shell.innerHTML = `
-    <div class="money-flow-header">
-      <p class="money-flow-note">
+  const shell = el(`
+    <div class="mf-screen">
+      <div class="mf-note">
         ${usingQuarterly
-          ? "Quarterly resolution, built from this company's own filed 10-Q/10-K figures — Q4 each year is derived as the fiscal year total minus Q1+Q2+Q3, since companies never file a standalone Q4 report."
-          : "Annual resolution — quarterly filings aren't available for this company (UK Companies House files annual accounts only, or SEC 10-Q data wasn't found)."}
-        Bucket granularity matches what's actually broken out in standardized filings (revenue, cost of revenue, SG&A, R&D, interest, tax, capex, debt/equity moves, dividends, buybacks) — not a line-item guess at things like "employees" or "marketing" spend, which aren't structured data anywhere free.
-      </p>
-      <div class="money-flow-tabs" role="tablist"></div>
+          ? "Quarterly resolution, built from this company's own filed 10-Q/10-K figures — Q4 each year is derived as the fiscal year total minus Q1+Q2+Q3."
+          : "Annual resolution — quarterly filings aren't available for this company (UK Companies House files annual accounts only)."}
+      </div>
+      <div class="mf-grid">
+        <div class="mf-left">
+          <h3>Where the capital sits</h3>
+          <p class="mf-hint">Select a bar to plot its history in the center. Bar length is proportional to the largest balance shown this period.</p>
+          <div class="mf-bars"></div>
+        </div>
+        <div class="mf-center">
+          <div class="mf-center-head">
+            <div>
+              <h3 class="mf-center-title"></h3>
+              <div class="mf-center-sub"></div>
+            </div>
+            <div class="mf-center-value"></div>
+          </div>
+          <div class="mf-center-chart-wrap"><canvas class="mf-center-canvas"></canvas></div>
+        </div>
+        <div class="mf-right">
+          <div class="mf-timeline">
+            <div class="mf-timeline-head">
+              <span class="mf-timeline-range"></span>
+            </div>
+            <div class="mf-timeline-scroll"></div>
+          </div>
+          <div class="mf-price">
+            <div class="mf-price-head">
+              <h3>Price vs. book value / share</h3>
+              <div class="mf-price-stats"></div>
+            </div>
+            <div class="mf-price-chart-wrap"><canvas class="mf-price-canvas"></canvas></div>
+            <div class="mf-scrub-row">
+              <button type="button" class="mf-scrub-step" data-dir="-1" aria-label="Previous period">◀</button>
+              <input type="range" class="mf-scrub-slider" min="0" max="${unified.periods.length - 1}" value="${state.index}" />
+              <button type="button" class="mf-scrub-step" data-dir="1" aria-label="Next period">▶</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="money-flow-slider-row">
-      <button class="money-flow-step" data-dir="-1" aria-label="Previous period">◀</button>
-      <input type="range" class="money-flow-slider" min="0" max="${unified.periods.length - 1}" value="${state.index}" />
-      <button class="money-flow-step" data-dir="1" aria-label="Next period">▶</button>
-      <span class="money-flow-period-label"></span>
-    </div>
-    <div class="money-flow-screen"></div>
-    <div class="money-flow-narrative"></div>
-  `;
+  `);
   container.append(shell);
 
-  const tabsEl = shell.querySelector(".money-flow-tabs");
-  const screenEl = shell.querySelector(".money-flow-screen");
-  const narrativeEl = shell.querySelector(".money-flow-narrative");
-  const sliderEl = shell.querySelector(".money-flow-slider");
-  const periodLabelEl = shell.querySelector(".money-flow-period-label");
+  const barsHost = shell.querySelector(".mf-bars");
+  const centerTitle = shell.querySelector(".mf-center-title");
+  const centerSub = shell.querySelector(".mf-center-sub");
+  const centerValue = shell.querySelector(".mf-center-value");
+  const centerCanvas = shell.querySelector(".mf-center-canvas");
+  const timelineScroll = shell.querySelector(".mf-timeline-scroll");
+  const timelineRange = shell.querySelector(".mf-timeline-range");
+  const priceStats = shell.querySelector(".mf-price-stats");
+  const priceCanvas = shell.querySelector(".mf-price-canvas");
+  const scrubSlider = shell.querySelector(".mf-scrub-slider");
 
-  for (const s of SCREENS) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "money-flow-tab";
-    btn.textContent = s.label;
-    btn.setAttribute("role", "tab");
-    btn.dataset.screen = s.id;
-    btn.addEventListener("click", () => {
-      state.screen = s.id;
-      renderScreen();
-    });
-    tabsEl.append(btn);
+  timelineRange.textContent = unified.periods.length
+    ? `${unified.periods[0].label} – ${unified.periods[unified.periods.length - 1].label}`
+    : "";
+
+  // --- Left panel: balance-sheet bars, built once, updated in place -------
+  function buildBarRow(key, label, isTotal) {
+    const row = el(`
+      <button type="button" class="mf-bar-row${isTotal ? " mf-bar-total" : ""}" data-key="${key}">
+        <div class="mf-bar-labels"><span class="mf-bar-label">${label}</span><span class="mf-bar-value"></span></div>
+        <div class="mf-bar-track"><div class="mf-bar-fill"></div></div>
+      </button>
+    `);
+    barsHost.append(row);
+    return row;
   }
 
-  function ctx() {
-    return {
-      unified,
-      graphSeries,
-      index: state.index,
-      graph: graphSeries[state.index],
-      period: unified.periods[state.index],
-      getNodeHistory: (nodeId) => getNodeHistory(unified, nodeId),
-      company,
-      base,
-      derived,
-      price,
-      usingQuarterly,
-      onJumpToPeriod: (i) => {
-        state.index = Math.max(0, Math.min(unified.periods.length - 1, i));
-        sliderEl.value = String(state.index);
-        renderScreen();
-      },
-    };
-  }
+  const barRows = [];
+  barRows.push({ key: "assets", label: "Total assets", row: buildBarRow("assets", "Total assets", true) });
+  for (const [id, label] of registry.assets) barRows.push({ key: id, label, row: buildBarRow(id, label, false) });
+  barRows.push({ key: "liabilities", label: "Total liabilities", row: buildBarRow("liabilities", "Total liabilities", true) });
+  for (const [id, label] of registry.liabEq) barRows.push({ key: id, label, row: buildBarRow(id, label, false) });
+  barRows.push({ key: "equity", label: "Net book capital (equity)", row: buildBarRow("equity", "Net book capital (equity)", true) });
 
-  function renderScreen() {
-    for (const btn of tabsEl.querySelectorAll(".money-flow-tab")) {
-      const active = btn.dataset.screen === state.screen;
-      btn.classList.toggle("active", active);
-      btn.setAttribute("aria-selected", String(active));
+  barsHost.addEventListener("click", (e) => {
+    const row = e.target.closest(".mf-bar-row");
+    if (!row) return;
+    const entry = barRows.find((b) => b.key === row.dataset.key);
+    if (!entry) return;
+    state.selectedKey = entry.key;
+    state.selectedLabel = entry.label;
+    renderAll();
+  });
+
+  function updateBars(i) {
+    const totalAssets = Math.abs(unified.series.assets?.[i] ?? 0);
+    const totalLiabEq = Math.abs(unified.series.liabilities?.[i] ?? 0) + Math.abs(unified.series.equity?.[i] ?? 0);
+    const maxScale = Math.max(totalAssets, totalLiabEq, 1);
+    for (const { key, row } of barRows) {
+      const val = unified.series[key]?.[i];
+      const fill = row.querySelector(".mf-bar-fill");
+      const valueEl = row.querySelector(".mf-bar-value");
+      row.classList.toggle("active", key === state.selectedKey);
+      if (val === null || val === undefined) {
+        fill.style.width = "0%";
+        valueEl.textContent = "—";
+        row.classList.add("mf-bar-empty");
+      } else {
+        fill.style.width = `${Math.min(100, (Math.abs(val) / maxScale) * 100)}%`;
+        valueEl.textContent = formatMoneyShort(val);
+        row.classList.remove("mf-bar-empty");
+      }
     }
-    periodLabelEl.textContent = unified.periods[state.index].label;
-    const screenDef = SCREENS.find((s) => s.id === state.screen);
-    screenDef.render(screenEl, ctx());
-    renderNarrative(narrativeEl, events, ctx());
   }
 
-  sliderEl.addEventListener("input", () => {
-    state.index = Number(sliderEl.value);
-    renderScreen();
-  });
-  shell.querySelectorAll(".money-flow-step").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.index = Math.max(0, Math.min(unified.periods.length - 1, state.index + Number(btn.dataset.dir)));
-      sliderEl.value = String(state.index);
-      renderScreen();
-    });
+  // --- Center panel: selected item's full history --------------------------
+  let centerChart = null;
+  function renderCenter(i) {
+    const history = getNodeHistory(unified, state.selectedKey);
+    centerTitle.textContent = state.selectedLabel;
+    const latest = lastNonNull(unified.series[state.selectedKey] || [], i);
+    centerValue.textContent = latest ? formatMoneyShort(latest.value) : "—";
+    const g = history?.growth?.[i];
+    centerSub.textContent = g !== null && g !== undefined ? `${g >= 0 ? "↑" : "↓"} ${formatPercent(Math.abs(g))} vs. prior period` : "";
+
+    const labels = unified.periods.map((p) => p.label);
+    const values = (unified.series[state.selectedKey] || []).slice();
+    const text = cssVar("--text", "#1c1a17");
+    const border = cssVar("--border", "#e4ddd2");
+    const accent = cssVar("--accent", "#1f5f4f");
+
+    const pointRadius = values.map((_, idx) => (idx === i ? 6 : 0));
+    const pointBg = values.map((_, idx) => (idx === i ? cssVar("--flag", "#b03a2e") : accent));
+
+    if (!centerChart) {
+      centerChart = new Chart(centerCanvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: accent,
+            backgroundColor: accent + "18",
+            fill: true,
+            tension: 0.2,
+            spanGaps: false,
+            pointRadius,
+            pointBackgroundColor: pointBg,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => formatMoneyShort(ctx.parsed.y) } },
+          },
+          scales: {
+            x: { ticks: { color: text, maxRotation: 0, autoSkip: true }, grid: { display: false } },
+            y: { ticks: { color: text, callback: (v) => formatMoneyShort(v) }, grid: { color: border } },
+          },
+        },
+      });
+    } else {
+      centerChart.data.labels = labels;
+      centerChart.data.datasets[0].data = values;
+      centerChart.data.datasets[0].pointRadius = pointRadius;
+      centerChart.data.datasets[0].pointBackgroundColor = pointBg;
+      centerChart.update();
+    }
+  }
+
+  // --- Right-top: vertical timeline, built once ----------------------------
+  const timelineRows = unified.periods.map((period, i) => {
+    const row = el(`
+      <button type="button" class="mf-timeline-row" data-index="${i}">
+        <span class="mf-timeline-dot"></span>
+        <span class="mf-timeline-text">
+          <span class="mf-timeline-period">${period.label}</span>
+          <span class="mf-timeline-line">${narrativeLineFor(unified, i)}</span>
+        </span>
+      </button>
+    `);
+    timelineScroll.append(row);
+    return row;
   });
 
-  renderScreen();
+  timelineScroll.addEventListener("click", (e) => {
+    const row = e.target.closest(".mf-timeline-row");
+    if (!row) return;
+    setIndex(Number(row.dataset.index));
+  });
+
+  function updateTimeline(i) {
+    timelineRows.forEach((row, idx) => row.classList.toggle("current", idx === i));
+    const current = timelineRows[i];
+    if (current) current.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  // --- Right-bottom: price vs. book value / share --------------------------
+  let priceChart = null;
+  function bookValuePerShareSeries() {
+    const equity = unified.series.equity || [];
+    const shares = unified.series.dilutedShares || [];
+    return unified.periods.map((_, idx) => div(equity[idx], shares[idx]));
+  }
+  const bvpsSeries = bookValuePerShareSeries();
+
+  function renderPrice(i) {
+    const labels = unified.periods.map((p) => p.label);
+    const prices = state.prices;
+    const good = cssVar("--good", "#1f7a4c");
+    const goodSoft = cssVar("--good-soft", "#e3f4e9");
+    const textMuted = cssVar("--text-muted", "#5c5650");
+    const text = cssVar("--text", "#1c1a17");
+    const border = cssVar("--border", "#e4ddd2");
+
+    const datasets = [];
+    if (prices) {
+      datasets.push({
+        label: "Price travelled",
+        data: prices.map((v, idx) => (idx <= i ? v : null)),
+        borderColor: good,
+        backgroundColor: goodSoft,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        spanGaps: false,
+        fill: false,
+      });
+      datasets.push({
+        label: "Price ahead",
+        data: prices.map((v, idx) => (idx >= i ? v : null)),
+        borderColor: good + "55",
+        borderDash: [4, 3],
+        pointRadius: 0,
+        spanGaps: false,
+        fill: false,
+      });
+    }
+    datasets.push({
+      label: "Book value / share",
+      data: bvpsSeries,
+      borderColor: textMuted,
+      borderDash: [3, 3],
+      pointRadius: 0,
+      spanGaps: false,
+      fill: false,
+    });
+
+    if (!priceChart) {
+      priceChart = new Chart(priceCanvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          plugins: {
+            legend: { display: true, position: "top", labels: { boxWidth: 10, usePointStyle: true, color: text, font: { size: 10 } } },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y === null ? "—" : "$" + ctx.parsed.y.toFixed(2)}` } },
+          },
+          scales: {
+            x: { ticks: { color: text, maxRotation: 0, autoSkip: true }, grid: { display: false } },
+            y: { ticks: { color: text, callback: (v) => "$" + v }, grid: { color: border } },
+          },
+        },
+      });
+    } else {
+      priceChart.data.labels = labels;
+      priceChart.data.datasets = datasets;
+      priceChart.update();
+    }
+
+    const priceNow = prices ? lastNonNull(prices, i) : null;
+    const bvpsNow = lastNonNull(bvpsSeries, i);
+    const pb = priceNow && bvpsNow ? div(priceNow.value, bvpsNow.value) : null;
+    priceStats.innerHTML = `
+      ${priceNow ? `<span>Price <b>$${priceNow.value.toFixed(2)}</b></span>` : `<span class="mf-price-unavailable">Price data unavailable for this company</span>`}
+      ${bvpsNow ? `<span>Book val/share <b>$${bvpsNow.value.toFixed(2)}</b></span>` : ""}
+      ${pb !== null ? `<span>P/B <b>${formatRatio(pb)}</b></span>` : ""}
+    `;
+  }
+
+  // --- Wiring ---------------------------------------------------------------
+  function renderAll() {
+    updateBars(state.index);
+    renderCenter(state.index);
+    updateTimeline(state.index);
+    renderPrice(state.index);
+  }
+
+  function setIndex(i) {
+    state.index = Math.max(0, Math.min(unified.periods.length - 1, i));
+    scrubSlider.value = String(state.index);
+    renderAll();
+  }
+
+  scrubSlider.addEventListener("input", () => setIndex(Number(scrubSlider.value)));
+  shell.querySelectorAll(".mf-scrub-step").forEach((btn) => {
+    btn.addEventListener("click", () => setIndex(state.index + Number(btn.dataset.dir)));
+  });
+
+  renderAll();
+
+  // Historical prices load async (a network round trip through the Worker) —
+  // the rest of the screen is fully usable before/without it, and a failure
+  // here never blocks anything else.
+  fetchStockPriceSeries(company.ticker, company.market, unified.periods, PROXY_URL).then((prices) => {
+    state.prices = prices;
+    renderPrice(state.index);
+  });
 }

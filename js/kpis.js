@@ -15,7 +15,11 @@ const RAW_TAGS = {
   operatingCashFlow: { taxonomy: "us-gaap", tags: ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"], kind: "flow" },
   capex: { taxonomy: "us-gaap", tags: ["PaymentsToAcquirePropertyPlantAndEquipment"], kind: "flow" },
   dilutedEps: { taxonomy: "us-gaap", tags: ["EarningsPerShareDiluted"], kind: "flow" },
-  dilutedShares: { taxonomy: "us-gaap", tags: ["WeightedAverageNumberOfDilutedSharesOutstanding"], kind: "flow" },
+  // "average", not "flow": a weighted-average share count over a period
+  // isn't additive the way revenue or cash flow is — quarterly figures
+  // don't sum to the annual one, so it needs different Q4-quarter handling
+  // (see extractQuarterly below) than every other duration-based tag here.
+  dilutedShares: { taxonomy: "us-gaap", tags: ["WeightedAverageNumberOfDilutedSharesOutstanding"], kind: "average" },
   grossProfit: { taxonomy: "us-gaap", tags: ["GrossProfit"], kind: "flow" },
   assetsCurrent: { taxonomy: "us-gaap", tags: ["AssetsCurrent"], kind: "instant" },
   liabilitiesCurrent: { taxonomy: "us-gaap", tags: ["LiabilitiesCurrent"], kind: "instant" },
@@ -63,7 +67,7 @@ function annualize(unitArray, kind) {
   const byEnd = new Map();
   for (const entry of unitArray || []) {
     if (!entry.form || !entry.form.startsWith("10-K")) continue;
-    if (kind === "flow") {
+    if (kind === "flow" || kind === "average") {
       const days = durationDays(entry);
       if (days === null || days < 300 || days > 380) continue;
     }
@@ -346,8 +350,17 @@ function extractQuarterly(units, kind) {
   const result = new Map();
   for (const [end, entry] of directQuarters) result.set(end, entry.val);
 
-  // Derive Q4 for each fiscal year where all three prior quarters were found.
   for (const [fyEnd, fyEntry] of fiscalYears) {
+    if (kind === "average") {
+      // Not additive (a weighted-average share count doesn't sum across
+      // quarters the way revenue does) — there's no way to derive a
+      // standalone Q4 figure from the other three, so the full-year
+      // reported average is used as the best available stand-in, only
+      // when no direct Q4 figure already exists.
+      if (!result.has(fyEnd)) result.set(fyEnd, fyEntry.val);
+      continue;
+    }
+    // Derive Q4 for each fiscal year where all three prior quarters were found.
     const fyEndDate = new Date(fyEnd);
     const priorBound = new Date(fyEndDate);
     priorBound.setUTCDate(priorBound.getUTCDate() - 370);
