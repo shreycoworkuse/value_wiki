@@ -80,15 +80,26 @@ function annualize(unitArray, kind) {
   return byEnd;
 }
 
+// Merges every fallback tag's data into one map, rather than committing to
+// whichever tag happens to have any data at all. A company can switch which
+// XBRL tag it uses for the same concept partway through its filing history
+// (e.g. CostOfGoodsAndServicesSold -> CostOfRevenue) — picking only the
+// first tag with data would silently drop every period reported under the
+// other tag, showing up as a gap even though the company really did report
+// that figure. Earlier tags in the list win on a period that both tag
+// variants happen to report (rare — XBRL discourages double-tagging the
+// same fact), otherwise whichever tag actually has that period fills it in.
 function pickTag(usGaap, tagList, kind) {
+  const merged = new Map();
   for (const tag of tagList) {
     const node = usGaap[tag];
     const units = node?.units?.USD || node?.units?.["USD/shares"] || node?.units?.shares;
-    if (units && units.length) {
-      return annualize(units, kind);
+    if (!units || !units.length) continue;
+    for (const [end, entry] of annualize(units, kind)) {
+      if (!merged.has(end)) merged.set(end, entry);
     }
   }
-  return new Map();
+  return merged;
 }
 
 // Builds { years: [...], series: { revenue: [{year, value}], ... } }
@@ -385,18 +396,22 @@ export function buildQuarterlySeries(companyFacts) {
   const byMetric = {};
   const allEnds = new Set();
 
+  // Same tag-merging as buildAnnualSeries's pickTag() above, and for the
+  // same reason: committing to the first tag variant with any data at all
+  // drops every period reported under a tag the company switched to (or
+  // from) later, which shows up as a gap even though real data exists.
   for (const [metric, def] of Object.entries(RAW_TAGS)) {
-    let map = new Map();
+    const merged = new Map();
     for (const tag of def.tags) {
       const node = usGaap[tag];
       const units = node?.units?.USD || node?.units?.["USD/shares"] || node?.units?.shares;
-      if (units && units.length) {
-        map = extractQuarterly(units, def.kind);
-        if (map.size) break;
+      if (!units || !units.length) continue;
+      for (const [end, val] of extractQuarterly(units, def.kind)) {
+        if (!merged.has(end)) merged.set(end, val);
       }
     }
-    byMetric[metric] = map;
-    for (const end of map.keys()) allEnds.add(end);
+    byMetric[metric] = merged;
+    for (const end of merged.keys()) allEnds.add(end);
   }
 
   const ends = [...allEnds].sort();

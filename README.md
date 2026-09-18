@@ -295,6 +295,18 @@ companies (Companies House files annual accounts only, no quarterly
 equivalent) fall back to annual resolution here, clearly labeled in the
 tab itself rather than silently only working for one market.
 
+**Why some figures used to have gaps, and don't anymore.** Every metric
+here is read from a small fallback list of XBRL tag names (e.g. cost of
+revenue can be tagged `CostOfRevenue` or `CostOfGoodsAndServicesSold`), because
+a company can switch which tag it uses for the same concept partway through
+its filing history (a common, real pattern — many filers moved to newer
+ASC 606 revenue tags around 2018). `pickTag()`/`buildQuarterlySeries()`
+used to commit to the *first* tag variant that had any data at all,
+silently dropping every period reported under the other tag — which showed
+up as a gap in a company's history even though it really had reported that
+figure, just under a different tag name. Both now merge every tag
+variant's data on a period-by-period basis instead.
+
 **Where the price data comes from.** There is no *official* free,
 no-key stock-price API. This tab uses Stooq's free daily-close CSV export
 (`stooq.com/q/d/l/`) instead — no login, no API key, the same free-tier
