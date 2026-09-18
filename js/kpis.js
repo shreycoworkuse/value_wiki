@@ -21,6 +21,34 @@ const RAW_TAGS = {
   liabilitiesCurrent: { taxonomy: "us-gaap", tags: ["LiabilitiesCurrent"], kind: "instant" },
   dividendsPaid: { taxonomy: "us-gaap", tags: ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"], kind: "flow" },
   incomeTaxExpense: { taxonomy: "us-gaap", tags: ["IncomeTaxExpenseBenefit"], kind: "flow" },
+
+  // Added for the money-flow ("Stories") tab: balance-sheet reservoirs,
+  // income-statement allocation buckets, and cash-flow-statement buckets.
+  // Every one of these is a standard us-gaap tag that shows up across most
+  // large filers — not a bespoke per-company breakdown.
+  inventory: { taxonomy: "us-gaap", tags: ["InventoryNet"], kind: "instant" },
+  accountsReceivable: { taxonomy: "us-gaap", tags: ["AccountsReceivableNetCurrent", "ReceivablesNetCurrent"], kind: "instant" },
+  accountsPayable: { taxonomy: "us-gaap", tags: ["AccountsPayableCurrent", "AccountsPayableAndAccruedLiabilitiesCurrent"], kind: "instant" },
+  ppe: { taxonomy: "us-gaap", tags: ["PropertyPlantAndEquipmentNet"], kind: "instant" },
+  goodwill: { taxonomy: "us-gaap", tags: ["Goodwill"], kind: "instant" },
+  retainedEarnings: { taxonomy: "us-gaap", tags: ["RetainedEarningsAccumulatedDeficit"], kind: "instant" },
+  additionalPaidInCapital: { taxonomy: "us-gaap", tags: ["AdditionalPaidInCapital", "AdditionalPaidInCapitalCommonStock"], kind: "instant" },
+  treasuryStockValue: { taxonomy: "us-gaap", tags: ["TreasuryStockValue", "TreasuryStockCommonValue"], kind: "instant" },
+  debtCurrent: { taxonomy: "us-gaap", tags: ["LongTermDebtCurrent", "DebtCurrent"], kind: "instant" },
+  sharesOutstanding: { taxonomy: "us-gaap", tags: ["CommonStockSharesOutstanding"], kind: "instant" },
+
+  costOfRevenue: { taxonomy: "us-gaap", tags: ["CostOfRevenue", "CostOfGoodsAndServicesSold", "CostOfGoodsAndServicesSoldExcludingDepreciationDepletionAndAmortization"], kind: "flow" },
+  sgaExpense: { taxonomy: "us-gaap", tags: ["SellingGeneralAndAdministrativeExpense"], kind: "flow" },
+  rdExpense: { taxonomy: "us-gaap", tags: ["ResearchAndDevelopmentExpense"], kind: "flow" },
+  interestExpense: { taxonomy: "us-gaap", tags: ["InterestExpense", "InterestExpenseDebt"], kind: "flow" },
+
+  investingCashFlow: { taxonomy: "us-gaap", tags: ["NetCashProvidedByUsedInInvestingActivities"], kind: "flow" },
+  financingCashFlow: { taxonomy: "us-gaap", tags: ["NetCashProvidedByUsedInFinancingActivities"], kind: "flow" },
+  changeInCash: { taxonomy: "us-gaap", tags: ["CashAndCashEquivalentsPeriodIncreaseDecrease", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"], kind: "flow" },
+  debtIssuance: { taxonomy: "us-gaap", tags: ["ProceedsFromIssuanceOfLongTermDebt"], kind: "flow" },
+  debtRepayment: { taxonomy: "us-gaap", tags: ["RepaymentsOfLongTermDebt"], kind: "flow" },
+  stockIssuance: { taxonomy: "us-gaap", tags: ["ProceedsFromIssuanceOfCommonStock"], kind: "flow" },
+  stockRepurchase: { taxonomy: "us-gaap", tags: ["PaymentsForRepurchaseOfCommonStock"], kind: "flow" },
 };
 
 function durationDays(entry) {
@@ -238,6 +266,134 @@ export function computeDerived({ years, series }) {
     effectiveTaxRate,
     fcfPayoutRatio,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Quarterly extraction, for the money-flow ("Stories") tab's time slider.
+//
+// SEC's company-facts payload already contains every filed fact (10-Q and
+// 10-K alike) in the same JSON buildAnnualSeries() reads — this needs no new
+// network request, just a different way of slicing the same data.
+//
+// For "instant" (balance-sheet) items, a quarter's value is just whatever
+// was reported as of that quarter's end date — 10-Qs report Q1-Q3 directly,
+// 10-Ks report Q4 (fiscal year end) directly. No derivation needed.
+//
+// For "flow" (income-statement / cash-flow) items, a 10-Q filing reports
+// BOTH the standalone quarter ("three months ended") and the year-to-date
+// cumulative figure ("six/nine months ended") as separate fact entries with
+// different start/end dates — filtering to ~80-100 day durations isolates
+// the standalone quarter and excludes the cumulative one. Q4 is never
+// reported standalone (only the full fiscal year is, in the 10-K), so it's
+// derived as FY − (Q1 + Q2 + Q3) — a standard, well-understood technique,
+// not a guess. If any of Q1-Q3 is missing for a fiscal year, Q4 is left as
+// a gap for that year rather than derived from an incomplete sum.
+function quarterDurationDays(entry) {
+  const d = durationDays(entry);
+  return d === null ? null : d;
+}
+
+function isQuarterFlow(entry) {
+  const d = quarterDurationDays(entry);
+  return d !== null && d >= 80 && d <= 100;
+}
+
+function isAnnualFlow(entry) {
+  const d = quarterDurationDays(entry);
+  return d !== null && d >= 300 && d <= 380;
+}
+
+function latestByEnd(entries, predicate) {
+  const byEnd = new Map();
+  for (const entry of entries || []) {
+    if (!predicate(entry)) continue;
+    const existing = byEnd.get(entry.end);
+    if (!existing || new Date(entry.filed) >= new Date(existing.filed)) {
+      byEnd.set(entry.end, entry);
+    }
+  }
+  return byEnd;
+}
+
+function quarterLabel(endDate) {
+  const d = new Date(endDate);
+  const q = Math.floor(d.getUTCMonth() / 3) + 1;
+  return `Q${q} ${d.getUTCFullYear()}`;
+}
+
+// Extracts one metric's quarterly values (a Map of end-date -> number),
+// combining directly-reported quarters with derived Q4s.
+function extractQuarterly(units, kind) {
+  if (kind === "instant") {
+    // Any form, any filer — a balance-sheet snapshot as of that end date.
+    const byEnd = new Map();
+    for (const entry of units || []) {
+      if (!entry.form || !(entry.form.startsWith("10-K") || entry.form.startsWith("10-Q"))) continue;
+      const existing = byEnd.get(entry.end);
+      if (!existing || new Date(entry.filed) >= new Date(existing.filed)) {
+        byEnd.set(entry.end, entry);
+      }
+    }
+    const result = new Map();
+    for (const [end, entry] of byEnd) result.set(end, entry.val);
+    return result;
+  }
+
+  // Flow: gather directly-reported quarters and fiscal-year totals.
+  const directQuarters = latestByEnd(units, isQuarterFlow);
+  const fiscalYears = latestByEnd(units, isAnnualFlow);
+
+  const result = new Map();
+  for (const [end, entry] of directQuarters) result.set(end, entry.val);
+
+  // Derive Q4 for each fiscal year where all three prior quarters were found.
+  for (const [fyEnd, fyEntry] of fiscalYears) {
+    const fyEndDate = new Date(fyEnd);
+    const priorBound = new Date(fyEndDate);
+    priorBound.setUTCDate(priorBound.getUTCDate() - 370);
+    const quartersInYear = [...directQuarters.values()].filter((q) => {
+      const qEnd = new Date(q.end);
+      return qEnd > priorBound && qEnd < fyEndDate;
+    });
+    if (quartersInYear.length !== 3) continue; // incomplete — don't guess Q4
+    const sumFirstThree = quartersInYear.reduce((acc, q) => acc + q.val, 0);
+    result.set(fyEnd, fyEntry.val - sumFirstThree);
+  }
+
+  return result;
+}
+
+// Builds { periods: [{end, label, fiscalYearEnd}], series: { revenue: [...], ... } },
+// one entry per fiscal quarter, sorted chronologically. Metrics not available
+// at quarterly resolution for a given period are left as null, same
+// convention as buildAnnualSeries.
+export function buildQuarterlySeries(companyFacts) {
+  const usGaap = companyFacts?.facts?.["us-gaap"] || {};
+  const byMetric = {};
+  const allEnds = new Set();
+
+  for (const [metric, def] of Object.entries(RAW_TAGS)) {
+    let map = new Map();
+    for (const tag of def.tags) {
+      const node = usGaap[tag];
+      const units = node?.units?.USD || node?.units?.["USD/shares"] || node?.units?.shares;
+      if (units && units.length) {
+        map = extractQuarterly(units, def.kind);
+        if (map.size) break;
+      }
+    }
+    byMetric[metric] = map;
+    for (const end of map.keys()) allEnds.add(end);
+  }
+
+  const ends = [...allEnds].sort();
+  const periods = ends.map((end) => ({ end, label: quarterLabel(end) }));
+  const series = {};
+  for (const metric of Object.keys(RAW_TAGS)) {
+    series[metric] = ends.map((end) => (byMetric[metric].has(end) ? byMetric[metric].get(end) : null));
+  }
+
+  return { periods, series };
 }
 
 export function lastValid(arr) {

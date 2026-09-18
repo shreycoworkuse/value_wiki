@@ -1,11 +1,12 @@
 import { searchTickers, findTickerExact, fetchCompanyFacts, filingIndexUrl, PROXY_URL } from "./sec.js";
 import { UK_TICKERS, findUkTicker, fetchUkCompanySeries } from "./uk-companies.js";
-import { buildAnnualSeries, computeDerived } from "./kpis.js";
+import { buildAnnualSeries, buildQuarterlySeries, computeDerived } from "./kpis.js";
 import { detectRedFlags } from "./redflags.js";
 import { buildChecklist } from "./verdict.js";
 import { initGlossary } from "./glossary.js";
-import { renderCoverStory, renderKpiGrid, renderFollowTheMoney, renderVerdict, renderValuation, renderSources } from "./ui.js";
+import { renderCoverStory, renderKpiGrid, renderVerdict, renderValuation, renderSources } from "./ui.js";
 import { renderStories } from "./stories.js";
+import { renderMoneyFlow } from "./money-flow.js";
 import { renderTimeline } from "./timeline.js";
 import { renderExecutionConsistency } from "./execution.js";
 import { renderValuationExtra } from "./valuation-extra.js";
@@ -30,11 +31,17 @@ async function resolveCompanyState(tickerQuery, onProgress) {
     onProgress?.(`Found ${base.years.length} years of annual filings (FY${base.years[0]}–FY${base.years[base.years.length - 1]})`);
     const derived = computeDerived(base);
     const checklist = buildChecklist(base, derived);
+    // Quarterly resolution (for the Money flow tab's time slider) comes free
+    // from the same already-fetched company-facts payload — no new request.
+    // Only US/SEC filers get it: UK Companies House files annual accounts
+    // only, so quarterly stays null there and that tab falls back to annual.
+    const quarterly = buildQuarterlySeries(facts);
     return {
       company: { name: secMatch.name, ticker: secMatch.ticker, cik: secMatch.cik, market: "US" },
       base,
       derived,
       checklist,
+      quarterly,
     };
   }
 
@@ -44,7 +51,7 @@ async function resolveCompanyState(tickerQuery, onProgress) {
     if (!result) throw new Error(`Couldn't find a ticker matching "${tickerQuery}".`);
     const derived = computeDerived(result.base);
     const checklist = buildChecklist(result.base, derived);
-    return { company: result.company, base: result.base, derived, checklist };
+    return { company: result.company, base: result.base, derived, checklist, quarterly: null };
   }
 
   return null;
@@ -64,7 +71,7 @@ const TABS = [
   { id: "cover", label: "Cover story", render: renderCoverStory },
   { id: "kpis", label: "KPI chapters", render: renderKpiGrid },
   { id: "stories", label: "Stories", render: renderStories },
-  { id: "money", label: "Follow the money", render: renderFollowTheMoney },
+  { id: "money", label: "Money flow", render: renderMoneyFlow },
   { id: "timeline", label: "Timeline", render: renderTimeline },
   { id: "execution", label: "Track Record", render: renderExecutionConsistency },
   { id: "verdict", label: "Verdict", render: renderVerdict },
@@ -80,6 +87,7 @@ const state = {
   redFlags: null,
   checklist: null,
   price: null,
+  quarterly: null,
   activeTab: "cover",
 };
 
@@ -135,7 +143,7 @@ async function loadDossier(tickerQuery) {
       setStatus(`Couldn't find a ticker matching "${tickerQuery}". This tool covers any US company that files with the SEC, plus a curated list of major LSE-listed companies (not every LSE ticker).`, true);
       return;
     }
-    const { company, base, derived, checklist } = result;
+    const { company, base, derived, checklist, quarterly } = result;
     onProgress("Computing KPIs, red flags and the owner's checklist, locally in your browser…");
     if (company.market !== "LSE" && base.series.dividendsPaid.every((v) => v === null)) {
       onProgress("No dividend data found — this company may not pay a dividend.");
@@ -147,6 +155,7 @@ async function loadDossier(tickerQuery) {
     state.derived = derived;
     state.redFlags = redFlags;
     state.checklist = checklist;
+    state.quarterly = quarterly;
     state.price = null;
     el.priceInput.value = "";
 
@@ -227,7 +236,7 @@ function setActiveTab(tabId) {
   }
   const tabDef = TABS.find((t) => t.id === tabId);
   const panel = el.panels.querySelector(`[data-panel="${tabId}"]`);
-  tabDef.render(panel, { company: state.company, base: state.base, derived: state.derived, redFlags: state.redFlags, checklist: state.checklist, price: state.price });
+  tabDef.render(panel, { company: state.company, base: state.base, derived: state.derived, redFlags: state.redFlags, checklist: state.checklist, price: state.price, quarterly: state.quarterly });
 }
 
 function setUrlTicker(ticker) {

@@ -1,0 +1,80 @@
+.money-flow-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.money-flow-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin: 0;
+}
+
+.money-flow-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.money-flow-tab {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.money-flow-tab.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.money-flow-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.money-flow-slider {
+  flex: 1;
+}
+
+.money-flow-step {
+  font: inherit;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.money-flow-period-label {
+  min-width: 90px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.money-flow-screen {
+  min-height: 320px;
+}
+
+.money-flow-narrative {
+  margin-top: 4px;
+}
+
+.money-flow-placeholder {
+  color: var(--text-muted);
+  padding: 24px;
+  text-align: center;
+}

@@ -199,43 +199,6 @@ export function renderKpiGrid(container, { company, base, derived }) {
   }
 }
 
-export function renderFollowTheMoney(container, { base, derived }) {
-  container.innerHTML = "";
-  const wrap = el(`
-    <div>
-      <div class="kpi-card">
-        <h3>Cash from operations vs. ${term("capital expenditures", "capital expenditures")}</h3>
-        <div class="kpi-headline">${term("free cash flow", "free cash flow")} is operating cash flow minus capex — the cash actually left over for owners after keeping the business running.</div>
-        <div class="kpi-chart-wrap"><canvas id="fcf-canvas"></canvas></div>
-      </div>
-      <div class="kpi-card" style="margin-top:18px;">
-        <h3>Full annual table</h3>
-        <div style="overflow-x:auto;">
-          <table class="money-table" id="money-table"></table>
-        </div>
-      </div>
-    </div>
-  `);
-  container.append(wrap);
-  const canvas = wrap.querySelector("#fcf-canvas");
-  setChartA11y(canvas, "Free cash flow", base.years, derived.freeCashFlow, "currency");
-  requestAnimationFrame(() => renderLineChart(canvas, base.years, derived.freeCashFlow, { currency: true }));
-
-  const rows = [
-    ["Revenue", base.series.revenue, true],
-    ["Net income", base.series.netIncome, true],
-    ["Operating cash flow", base.series.operatingCashFlow, true],
-    ["Capital expenditures", base.series.capex, true],
-    ["Free cash flow", derived.freeCashFlow, true],
-    ["Total assets", base.series.assets, true],
-    ["Total liabilities", base.series.liabilities, true],
-    ["Stockholders' equity", base.series.equity, true],
-    ["Long-term debt", base.series.longTermDebt, true],
-  ];
-  const table = wrap.querySelector("#money-table");
-  table.innerHTML = `<thead><tr><th>Fiscal year</th>${base.years.map((y) => `<th>${y}</th>`).join("")}</tr></thead>
-    <tbody>${rows.map(([label, arr]) => `<tr><td>${label}</td>${arr.map((v) => `<td>${formatMoney(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
-}
 
 export function renderVerdict(container, { company, checklist, redFlags }) {
   container.innerHTML = "";

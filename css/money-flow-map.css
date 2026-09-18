@@ -1,0 +1,110 @@
+.money-flow-map { display: block; }
+.mfm-wrap { display: flex; flex-direction: column; gap: 18px; }
+
+.mfm-empty { color: var(--text-muted); padding: 20px 0; }
+
+.mfm-period-label {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mfm-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.78rem; color: var(--text-muted); }
+.mfm-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.mfm-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.mfm-swatch-in { background: var(--good); }
+.mfm-swatch-mid { background: var(--watch); }
+.mfm-swatch-out { background: var(--flag); }
+.mfm-swatch-neg { background: transparent; border: 2px dashed var(--flag); }
+
+.mfm-flow-host {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  overflow-x: auto;
+}
+.mfm-svg { width: 100%; height: auto; min-width: 560px; display: block; }
+
+.mfm-node { cursor: pointer; }
+.mfm-node-rect { stroke-width: 1.5; transition: filter 0.1s ease; }
+.mfm-node:hover .mfm-node-rect { filter: brightness(1.08); }
+.mfm-node:focus-visible .mfm-node-rect,
+.mfm-node:focus .mfm-node-rect { stroke-width: 3; stroke: var(--accent); outline: none; }
+
+.mfm-node-label { font-size: 9.5px; fill: var(--text); font-family: var(--sans); pointer-events: none; }
+.mfm-node-value { font-size: 9.5px; fill: var(--text-muted); font-family: var(--sans); pointer-events: none; }
+
+.mfm-cat-source, .mfm-cat-financing-source { fill: var(--good-soft); stroke: var(--good); }
+.mfm-cat-operating-use, .mfm-cat-investing-use, .mfm-cat-financing-use { fill: var(--flag-soft); stroke: var(--flag); }
+.mfm-cat-flow-result { fill: var(--accent-soft); stroke: var(--accent); }
+.mfm-cat-bridge, .mfm-cat-stock-delta { fill: var(--watch-soft); stroke: var(--watch); }
+
+.mfm-edge { fill: none; opacity: 0.5; }
+.mfm-edge-negative { stroke-dasharray: 6 4; opacity: 0.7; }
+
+.mfm-reservoirs {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mfm-reservoirs-heading { font-weight: 700; font-size: 0.92rem; color: var(--text); }
+.mfm-reservoir-row { display: flex; flex-direction: column; gap: 6px; }
+.mfm-reservoir-row-title { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.mfm-reservoir-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  min-height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mfm-reservoir-seg {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  cursor: pointer;
+  font-family: var(--sans);
+  overflow: hidden;
+}
+.mfm-reservoir-seg:hover { filter: brightness(1.08); }
+.mfm-reservoir-seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mfm-reservoir-seg-label { font-size: 0.72rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mfm-reservoir-seg-value { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+.mfm-reservoir-empty { color: var(--text-muted); font-size: 0.82rem; padding: 16px 0; }
+
+.mfm-reservoir-seg.mfm-cat-asset-stock { background: var(--accent-soft); }
+.mfm-reservoir-seg.mfm-cat-liability-stock { background: var(--flag-soft); }
+.mfm-reservoir-seg.mfm-cat-equity-stock { background: var(--good-soft); }
+
+.mfm-drilldown {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.mfm-drilldown-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.mfm-drilldown-head h4 { margin: 0; font-size: 1rem; font-family: var(--serif); }
+.mfm-drilldown-close {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  width: 28px; height: 28px; cursor: pointer; color: var(--text-muted); font-size: 0.85rem;
+}
+.mfm-drilldown-close:hover { border-color: var(--accent); color: var(--accent); }
+.mfm-drilldown-stat { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+.mfm-drilldown-chart { height: 220px; }
+.mfm-drilldown-empty { color: var(--text-muted); font-size: 0.85rem; }
+
+@media (max-width: 640px) {
+  .mfm-svg { min-width: 480px; }
+}
