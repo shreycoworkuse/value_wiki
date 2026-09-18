@@ -236,6 +236,71 @@ this secret set, UK lookups fail gracefully with a clear "Companies House
 API key not configured" message rather than a silent or confusing error —
 the rest of the site (all US/SEC functionality) is unaffected either way.
 
+## The "Money flow" tab
+
+A time-sliced, animated view of the whole business, built entirely from data
+the app is already fetching — no new network calls, no new dependencies,
+no server-side computation. It has three sub-screens sharing one time
+slider, plus a rule-based narrative feed:
+
+- **Business map** (`js/money-flow-map.js`) — a hand-rolled SVG diagram for
+  the currently-selected period: money sources (revenue, new debt/equity) on
+  the left, the accrual-to-cash bridge (net income → operating cash flow →
+  change in cash) in the middle, and where cash went (cost of revenue, SG&A,
+  R&D, interest, tax, capex, debt repayment, buybacks, dividends) on the
+  right — plus a separate balance-sheet "reservoirs" panel below (what the
+  company owns vs. owes vs. owners' equity, sized proportionally to value).
+  Every node is clickable (and keyboard-operable) to drill into its full
+  history as a chart, with its latest growth rate and ratio-to-revenue.
+- **Business health** (`js/business-health.js`) — trend charts (revenue
+  growth, gross margin, FCF margin, ROIC/ROCE, debt/equity) plus a "Business
+  Health Bubble": one bubble per year, x = revenue growth, y = ROIC, size =
+  a metric you choose (revenue, FCF, or assets) — a visual read on whether
+  growth is coming with or without good returns on capital.
+- **Market vs. business** (`js/market-vs-business.js`) — book value/share
+  and FCF/share trends over the company's full history, compared against
+  the one current price you can optionally type in at the top of the page
+  (market cap, enterprise value, and the same intrinsic-value range as the
+  "What is it worth" tab, for the latest period only).
+- **Narrative events** (`js/story-narrative.js`) — rule-based, threshold
+  triggered facts (inventory or receivables outpacing revenue, a debt spike,
+  free cash flow flipping sign, a material gross-margin move), each written
+  from the real computed numbers for that period, never invented. Same
+  house style as the Verdict tab's red-flag checks: fixed, published
+  thresholds, no AI. Clicking an event jumps the shared time slider to that
+  period.
+
+**The data engine underneath (`js/financial-graph.js`):** normalizes one
+period's figures into a fixed set of nodes (dollar buckets) and edges
+(dollar amounts between them), plus a cash-flow reconciliation check
+(opening cash + operating + investing + financing cash flow should equal
+closing cash) that flags — rather than silently hides — a real inconsistency
+in what was filed.
+
+**Bucket granularity is honest, not aspirational.** The node/edge set
+matches exactly what standardized XBRL actually breaks a filing into —
+revenue, cost of revenue, SG&A, R&D, interest, tax, capex, debt/equity
+issuance and repayment, dividends, buybacks, and the core balance-sheet
+lines. It is *not* a line-item breakdown into things like "Employees" or
+"Marketing" spend — that granularity isn't tagged as structured, free data
+anywhere, for arbitrary companies, so this tool doesn't pretend to have it.
+
+**Quarterly resolution is US/SEC-only.** `js/kpis.js`'s `buildQuarterlySeries()`
+extracts per-quarter figures from the same already-fetched company-facts
+payload (10-Q "three months ended" contexts), deriving each year's Q4 as
+the fiscal-year total minus Q1+Q2+Q3 — a standard technique, and only ever
+applied when all three quarters were actually filed, never guessed from an
+incomplete set. UK companies (Companies House files annual accounts only,
+no quarterly equivalent) fall back to annual resolution here, clearly
+labeled in the tab itself rather than silently only working for one market.
+
+**No historical stock-price chart, on purpose.** There is no free, no-key,
+CORS-friendly historical stock-price API anywhere (the same investigation
+that ruled one out for the Timeline tab). The "Market vs. business" screen
+therefore only ever compares the business's own multi-year numbers against
+the single current price a visitor optionally types in — it never fetches,
+fabricates, or extrapolates a price history.
+
 ## How the data flows
 
 1. `js/sec.js` reads the same-origin `data/company_tickers.json` (refreshed
@@ -258,5 +323,9 @@ the rest of the site (all US/SEC functionality) is unaffected either way.
    `js/valuation-extra.js` render the rest — all following the same
    fixed-rule, no-AI, no-fabricated-data approach, using the vendored
    Chart.js.
+6. `js/money-flow.js` orchestrates the "Money flow" tab, normalizing data
+   through `js/financial-graph.js` and rendering `js/money-flow-map.js`,
+   `js/business-health.js`, `js/market-vs-business.js` and
+   `js/story-narrative.js` — see "The Money flow tab" above.
 
 Everything above runs client-side, in the visitor's own browser.
